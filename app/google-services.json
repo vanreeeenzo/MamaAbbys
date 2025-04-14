@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "872558186375",
+    "project_id": "mamaabbys",
+    "storage_bucket": "mamaabbys.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:872558186375:android:7a2031f96d14effc97cd22",
+        "android_client_info": {
+          "package_name": "com.example.mamaabbys"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0guRq1X9Wa4xcVSZfRktjmFtxTnvdFJI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
