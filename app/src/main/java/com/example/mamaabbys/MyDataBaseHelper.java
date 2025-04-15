@@ -103,4 +103,31 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             Toast.makeText(context, "Updated Successfully!", Toast.LENGTH_SHORT).show();
         }
     }
+
+    public List<InventoryItem> getAllInventoryItems() {
+        List<InventoryItem> inventoryItems = new ArrayList<>();
+        String query = "SELECT " + COLUMN_ID + ", " + COLUMN_NAME + ", " + COLUMN_QTY + ", " + COLUMN_MIN_THRESHOLD +
+                " FROM " + TABLE_NAME;
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(query, null);
+
+        if (cursor.moveToFirst()) {
+            do {
+                String id = cursor.getString(0);
+                String name = cursor.getString(1);
+                int quantity = cursor.getInt(2);
+                int minThreshold = cursor.getInt(3);
+                String stockInfo = "In Stock: " + quantity;
+                
+                // Add warning if stock is below threshold
+                if (quantity <= minThreshold) {
+                    stockInfo += " (Low Stock!)";
+                }
+                
+                inventoryItems.add(new InventoryItem(id, name, stockInfo, R.drawable.ic_package));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return inventoryItems;
+    }
 }
