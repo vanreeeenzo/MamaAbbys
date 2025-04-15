@@ -8,28 +8,16 @@
     android:padding="50dp"
     tools:context=".AddInventory">
 
-    <EditText
-        android:id="@+id/product_name_input"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="150dp"
-        android:ems="10"
-        android:hint="Product Name"
-        android:inputType="text"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
     <Spinner
         android:id="@+id/productNames"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="150dp"
+        android:hint="Select Product"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/product_name_input" />
+        app:layout_constraintTop_toTopOf="parent" />
 
     <EditText
         android:id="@+id/product_qty_input"
