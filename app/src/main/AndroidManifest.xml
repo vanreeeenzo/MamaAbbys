@@ -17,7 +17,7 @@
             android:label="Add Inventory"
             android:parentActivityName=".MainActivity"/>
         <activity
-            android:name=".MainActivity"
+            android:name=".Login"
             android:exported="true"
             android:label="Dashboard">
             <intent-filter>
@@ -27,6 +27,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".Register" />
+        <activity android:name=".MainActivity" />
     </application>
 
 </manifest>

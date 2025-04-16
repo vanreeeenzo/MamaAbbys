@@ -1,13 +1,8 @@
 package com.example.mamaabbys;
 
-import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
-
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.viewpager2.widget.ViewPager2;
-
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.firebase.database.FirebaseDatabase;
@@ -17,8 +12,6 @@ public class MainActivity extends AppCompatActivity {
     private TabLayout tabLayout;
     private DashboardPagerAdapter pagerAdapter;
 
-    FloatingActionButton quickActionsBar;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -26,7 +19,6 @@ public class MainActivity extends AppCompatActivity {
 
         viewPager = findViewById(R.id.viewPager);
         tabLayout = findViewById(R.id.tabLayout);
-        quickActionsBar = findViewById(R.id.quickActionsBar);
 
         // Create adapter
         pagerAdapter = new DashboardPagerAdapter(this);
@@ -50,12 +42,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }).attach();
 
-        quickActionsBar.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Intent intent = new Intent(MainActivity.this, AddInventory.class);
-                startActivity(intent);
-            }
-        });
+        FirebaseDatabase.getInstance().getReference().child("Inventory").child("Meat").setValue("TJ Hotdog");
     }
 }
