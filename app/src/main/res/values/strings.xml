@@ -1,3 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MamaAbbys</string>
+    <string name="select_category">Select Category</string>
+    <string name="select_product">Select Product</string>
 </resources>

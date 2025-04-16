@@ -1,6 +1,9 @@
 package com.example.mamaabbys;
 
-public class InventoryItem {
+import android.os.Parcel;
+import android.os.Parcelable;
+
+public class InventoryItem implements Parcelable {
     private String id;
     private String name;
     private String stockInfo;
@@ -12,6 +15,25 @@ public class InventoryItem {
         this.stockInfo = stockInfo;
         this.iconResId = iconResId;
     }
+
+    protected InventoryItem(Parcel in) {
+        id = in.readString();
+        name = in.readString();
+        stockInfo = in.readString();
+        iconResId = in.readInt();
+    }
+
+    public static final Creator<InventoryItem> CREATOR = new Creator<InventoryItem>() {
+        @Override
+        public InventoryItem createFromParcel(Parcel in) {
+            return new InventoryItem(in);
+        }
+
+        @Override
+        public InventoryItem[] newArray(int size) {
+            return new InventoryItem[size];
+        }
+    };
 
     public String getId() {
         return id;
@@ -27,5 +49,18 @@ public class InventoryItem {
 
     public int getIconResId() {
         return iconResId;
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeString(id);
+        dest.writeString(name);
+        dest.writeString(stockInfo);
+        dest.writeInt(iconResId);
     }
 } 
