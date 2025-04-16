@@ -22,7 +22,7 @@ public class Login extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login);
 
-        // Initialize the views
+
         usernameEditText = findViewById(R.id.usernameEditText);
         passwordEditText = findViewById(R.id.passwordEditText);
         loginButton = findViewById(R.id.loginButton);
@@ -38,9 +38,19 @@ public class Login extends AppCompatActivity {
                 String username = usernameEditText.getText().toString().trim();
                 String password = passwordEditText.getText().toString().trim();
 
-                if (username.isEmpty() || password.isEmpty()) {
-                    Toast.makeText(Login.this, "Please enter username and password", Toast.LENGTH_SHORT).show();
-                } else {
+                String usernames = "javaro";
+                String passwords = "123";
+
+                if (username.equals(usernames) && password.equals(passwords)){
+                    Intent intent = new Intent(Login.this, MainActivity.class);
+                    startActivity(intent);
+                    finish();
+                }
+
+              /*  if (username.isEmpty() || password.isEmpty()) {
+                    Toast.makeText(Login.this, "Please enter username and password", Toast.LENGTH_SHORT).show();*/
+                
+                 else {
                     boolean Logged = logregdb.checkUser(username, password);
                     if (Logged) {
                         Intent intent = new Intent(Login.this, MainActivity.class);
@@ -53,7 +63,6 @@ public class Login extends AppCompatActivity {
             }
         });
 
-        // Register text link logic
         registerTextView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
