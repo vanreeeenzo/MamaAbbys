@@ -1,5 +1,5 @@
 package com.example.mamaabbys;
-/*
+
 public class User {
     private int id;
     private String fullname;
