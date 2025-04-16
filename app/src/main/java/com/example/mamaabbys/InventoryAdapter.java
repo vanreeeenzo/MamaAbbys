@@ -49,6 +49,11 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.Inve
         return items.size();
     }
 
+    public void updateItems(List<InventoryItem> newItems) {
+        this.items = newItems;
+        notifyDataSetChanged();
+    }
+
     static class InventoryViewHolder extends RecyclerView.ViewHolder {
         TextView itemName;
         TextView stockInfo;

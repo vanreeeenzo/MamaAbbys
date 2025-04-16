@@ -13,10 +13,16 @@
         android:theme="@style/Theme.MamaAbbys"
         tools:targetApi="31">
         <activity
+            android:name=".AddInventory"
+            android:label="Add Inventory"
+            android:parentActivityName=".MainActivity"/>
+        <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:label="Dashboard">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+                <action android:name="android.intent.action.VIEW" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
