@@ -12,7 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 public class Login extends AppCompatActivity {
 
-    LogregDB logregdb;
+    MyDataBaseHelper myDB;
     EditText usernameEditText, passwordEditText;
     Button loginButton;
     TextView registerTextView;
@@ -22,15 +22,12 @@ public class Login extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login);
 
-
         usernameEditText = findViewById(R.id.usernameEditText);
         passwordEditText = findViewById(R.id.passwordEditText);
         loginButton = findViewById(R.id.loginButton);
         registerTextView = findViewById(R.id.registerTextView);
 
-
-        logregdb = new LogregDB(this);
-
+        myDB = new MyDataBaseHelper(this);
 
         loginButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -45,13 +42,8 @@ public class Login extends AppCompatActivity {
                     Intent intent = new Intent(Login.this, MainActivity.class);
                     startActivity(intent);
                     finish();
-                }
-
-              /*  if (username.isEmpty() || password.isEmpty()) {
-                    Toast.makeText(Login.this, "Please enter username and password", Toast.LENGTH_SHORT).show();*/
-                
-                 else {
-                    boolean Logged = logregdb.checkUser(username, password);
+                } else {
+                    boolean Logged = myDB.checkUser(username, password);
                     if (Logged) {
                         Intent intent = new Intent(Login.this, MainActivity.class);
                         startActivity(intent);
@@ -70,6 +62,5 @@ public class Login extends AppCompatActivity {
                 startActivity(intent);
             }
         });
-
     }
 }

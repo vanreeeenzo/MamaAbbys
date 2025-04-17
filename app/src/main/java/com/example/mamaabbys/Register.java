@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 public class Register extends AppCompatActivity {
     EditText fullnameEditTxt, EmailEditTxt, PasswordEditTxt, confirmPasswordEditTxt;
     Button btnregisterButton;
+    MyDataBaseHelper myDB;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -23,6 +24,8 @@ public class Register extends AppCompatActivity {
         PasswordEditTxt = findViewById(R.id.passwordEditText);
         confirmPasswordEditTxt = findViewById(R.id.confirmPasswordEditText);
         btnregisterButton = findViewById(R.id.registerButton);
+
+        myDB = new MyDataBaseHelper(this);
 
         btnregisterButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -38,8 +41,7 @@ public class Register extends AppCompatActivity {
                     Toast.makeText(Register.this, "Passwords do not match", Toast.LENGTH_SHORT).show();
                 } else {
                     User user = new User(strfullname, strEmail, strpassword);
-                    LogregDB database = new LogregDB(Register.this);
-                    database.addUser (user);
+                    myDB.addUser(user);
 
                     Toast.makeText(Register.this, "Account Created!", Toast.LENGTH_SHORT).show();
 

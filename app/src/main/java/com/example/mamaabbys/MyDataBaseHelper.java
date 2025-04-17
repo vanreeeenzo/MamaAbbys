@@ -20,15 +20,21 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
     private static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
-    private static final String TABLE_NAME = "Inventory";
+    private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
     private static final String COLUMN_NAME = "Product_Name";
     private static final String COLUMN_CATEGORY = "Product_Category";
     private static final String COLUMN_QTY = "Product_Qty";
     private static final String COLUMN_PRICE = "Product_Price";
     private static final String COLUMN_MIN_THRESHOLD = "Product_Min_Threshold";
+
+    private static final String TABLE_USERS = "users";
+    private static final String COLUMN_USER_ID = "id";
+    private static final String COLUMN_FULLNAME = "fullname";
+    private static final String COLUMN_EMAIL = "email";
+    private static final String COLUMN_PASSWORD = "password";
 
     private static final Map<String, Float> PRODUCT_PRICES = new HashMap<>();
     private static final Map<String, Integer> PRODUCT_THRESHOLDS = new HashMap<>();
@@ -43,17 +49,25 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         try {
-            String query = "CREATE TABLE " + TABLE_NAME + "(" + COLUMN_ID +
+            String inventoryQuery = "CREATE TABLE " + TABLE_INVENTORY + "(" + COLUMN_ID +
                     " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     COLUMN_NAME + " TEXT, " +
                     COLUMN_CATEGORY + " TEXT, " +
                     COLUMN_QTY + " INTEGER, " +
                     COLUMN_PRICE + " FLOAT, " +
                     COLUMN_MIN_THRESHOLD + " INTEGER);";
-            db.execSQL(query);
-            Log.d(TAG, "Database table created successfully");
+            db.execSQL(inventoryQuery);
+
+            String usersQuery = "CREATE TABLE " + TABLE_USERS + " (" +
+                    COLUMN_USER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_FULLNAME + " TEXT, " +
+                    COLUMN_EMAIL + " TEXT, " +
+                    COLUMN_PASSWORD + " TEXT)";
+            db.execSQL(usersQuery);
+
+            Log.d(TAG, "Database tables created successfully");
         } catch (Exception e) {
-            Log.e(TAG, "Error creating database table: " + e.getMessage());
+            Log.e(TAG, "Error creating database tables: " + e.getMessage());
         }
     }
 
@@ -61,13 +75,22 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         try {
             if (oldVersion < 2) {
-                db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + COLUMN_CATEGORY + " TEXT");
+                db.execSQL("ALTER TABLE " + TABLE_INVENTORY + " ADD COLUMN " + COLUMN_CATEGORY + " TEXT");
                 Log.d(TAG, "Added category column");
             }
             if (oldVersion < 3) {
-                db.execSQL("DROP TABLE IF EXISTS " + TABLE_NAME);
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_INVENTORY);
                 onCreate(db);
-                Log.d(TAG, "Recreated table for version 3");
+                Log.d(TAG, "Recreated inventory table for version 3");
+            }
+            if (oldVersion < 4) {
+                String usersQuery = "CREATE TABLE " + TABLE_USERS + " (" +
+                        COLUMN_USER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        COLUMN_FULLNAME + " TEXT, " +
+                        COLUMN_EMAIL + " TEXT, " +
+                        COLUMN_PASSWORD + " TEXT)";
+                db.execSQL(usersQuery);
+                Log.d(TAG, "Added users table for version 4");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error upgrading database: " + e.getMessage());
@@ -77,7 +100,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     @Override
     public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         try {
-            db.execSQL("DROP TABLE IF EXISTS " + TABLE_NAME);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_INVENTORY);
             onCreate(db);
             Log.d(TAG, "Handled database downgrade");
         } catch (Exception e) {
@@ -168,7 +191,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             int min_threshold = PRODUCT_THRESHOLDS.getOrDefault(productKey, 10);
 
             if (isProductExists(name, category)) {
-                String updateQuery = "UPDATE " + TABLE_NAME + " SET " + COLUMN_QTY + " = " + COLUMN_QTY + " + ? WHERE " + COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ?";
+                String updateQuery = "UPDATE " + TABLE_INVENTORY + " SET " + COLUMN_QTY + " = " + COLUMN_QTY + " + ? WHERE " + COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ?";
                 db.execSQL(updateQuery, new Object[]{qty, name, category});
                 Toast.makeText(context, "Quantity updated successfully!", Toast.LENGTH_SHORT).show();
             } else {
@@ -178,7 +201,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 cv.put(COLUMN_PRICE, price);
                 cv.put(COLUMN_MIN_THRESHOLD, min_threshold);
 
-                long result = db.insert(TABLE_NAME, null, cv);
+                long result = db.insert(TABLE_INVENTORY, null, cv);
                 if(result == -1) {
                     Toast.makeText(context, "Failed to add inventory", Toast.LENGTH_SHORT).show();
                 } else {
@@ -250,7 +273,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         Cursor cursor = null;
         try {
             db = this.getReadableDatabase();
-            String query = "SELECT * FROM " + TABLE_NAME + " WHERE " + COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ?";
+            String query = "SELECT * FROM " + TABLE_INVENTORY + " WHERE " + COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ?";
             cursor = db.rawQuery(query, new String[]{productName, category});
             return cursor.getCount() > 0;
         } catch (Exception e) {
@@ -270,7 +293,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         try {
             db = this.getReadableDatabase();
             String query = "SELECT " + COLUMN_ID + ", " + COLUMN_NAME + ", " + COLUMN_CATEGORY + ", " +
-                    COLUMN_QTY + ", " + COLUMN_PRICE + ", " + COLUMN_MIN_THRESHOLD + " FROM " + TABLE_NAME;
+                    COLUMN_QTY + ", " + COLUMN_PRICE + ", " + COLUMN_MIN_THRESHOLD + " FROM " + TABLE_INVENTORY;
             cursor = db.rawQuery(query, null);
 
             if (cursor.moveToFirst()) {
@@ -304,11 +327,31 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = null;
         try {
             db = this.getWritableDatabase();
-            db.delete(TABLE_NAME, null, null);
+            db.delete(TABLE_INVENTORY, null, null);
             Toast.makeText(context, "All inventory items deleted", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Log.e(TAG, "Error deleting all inventory: " + e.getMessage());
             Toast.makeText(context, "Error deleting inventory: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    public void addUser(User user) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_FULLNAME, user.getFullname());
+        values.put(COLUMN_EMAIL, user.getEmail());
+        values.put(COLUMN_PASSWORD, user.getPassword());
+        db.insert(TABLE_USERS, null, values);
+        db.close();
+    }
+
+    public boolean checkUser(String fullname, String password) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT * FROM " + TABLE_USERS + " WHERE " + COLUMN_FULLNAME + " = ? AND " + COLUMN_PASSWORD + " = ?", 
+            new String[]{fullname, password});
+        boolean result = cursor.getCount() > 0;
+        cursor.close();
+        db.close();
+        return result;
     }
 }
