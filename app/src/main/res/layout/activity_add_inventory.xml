@@ -15,20 +15,22 @@
             android:id="@+id/categoryLayout"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="50dp"
-            android:layout_marginTop="250dp"
-            android:layout_marginEnd="50dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
             android:hint="Category"
+            app:boxStrokeColor="?attr/colorPrimary"
+            app:hintTextColor="?attr/colorPrimary"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:boxStrokeColor="?attr/colorPrimary"
-            app:hintTextColor="?attr/colorPrimary">
+            app:layout_constraintTop_toTopOf="parent">
 
             <Spinner
                 android:id="@+id/categorySpinner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:background="@null"
                 android:prompt="@string/select_category" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -36,20 +38,22 @@
             android:id="@+id/productLayout"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="50dp"
+            android:layout_marginStart="16dp"
             android:layout_marginTop="16dp"
-            android:layout_marginEnd="50dp"
+            android:layout_marginEnd="16dp"
             android:hint="Product"
+            app:boxStrokeColor="?attr/colorPrimary"
+            app:hintTextColor="?attr/colorPrimary"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/categoryLayout"
-            app:boxStrokeColor="?attr/colorPrimary"
-            app:hintTextColor="?attr/colorPrimary">
+            app:layout_constraintTop_toBottomOf="@id/categoryLayout">
 
             <Spinner
                 android:id="@+id/productSpinner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:background="@null"
                 android:prompt="@string/select_product" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -57,15 +61,16 @@
             android:id="@+id/quantityLayout"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="50dp"
+            android:layout_marginStart="16dp"
             android:layout_marginTop="16dp"
-            android:layout_marginEnd="50dp"
+            android:layout_marginEnd="16dp"
             android:hint="Quantity"
+            app:boxStrokeColor="?attr/colorPrimary"
+            app:hintTextColor="?attr/colorPrimary"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/productLayout"
-            app:boxStrokeColor="?attr/colorPrimary"
-            app:hintTextColor="?attr/colorPrimary">
+            app:layout_constraintTop_toBottomOf="@id/productLayout">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/quantityInput"
@@ -79,12 +84,15 @@
             android:id="@+id/saveButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="50dp"
+            android:layout_marginStart="16dp"
             android:layout_marginTop="24dp"
-            android:layout_marginEnd="50dp"
+            android:layout_marginEnd="16dp"
             android:text="Save Item"
+            android:textColor="@color/white"
             app:icon="@drawable/ic_save"
             app:iconTint="@color/white"
+            app:backgroundTint="?attr/colorPrimary"
+            app:cornerRadius="8dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/quantityLayout" />

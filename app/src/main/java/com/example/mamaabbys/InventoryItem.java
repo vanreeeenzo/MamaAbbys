@@ -8,12 +8,14 @@ public class InventoryItem implements Parcelable {
     private String name;
     private String stockInfo;
     private int iconResId;
+    private String category;
 
-    public InventoryItem(String id, String name, String stockInfo, int iconResId) {
+    public InventoryItem(String id, String name, String stockInfo, int iconResId, String category) {
         this.id = id;
         this.name = name;
         this.stockInfo = stockInfo;
         this.iconResId = iconResId;
+        this.category = category;
     }
 
     protected InventoryItem(Parcel in) {
@@ -21,6 +23,7 @@ public class InventoryItem implements Parcelable {
         name = in.readString();
         stockInfo = in.readString();
         iconResId = in.readInt();
+        category = in.readString();
     }
 
     public static final Creator<InventoryItem> CREATOR = new Creator<InventoryItem>() {
@@ -51,6 +54,10 @@ public class InventoryItem implements Parcelable {
         return iconResId;
     }
 
+    public String getCategory() {
+        return category;
+    }
+
     @Override
     public int describeContents() {
         return 0;
@@ -62,5 +69,6 @@ public class InventoryItem implements Parcelable {
         dest.writeString(name);
         dest.writeString(stockInfo);
         dest.writeInt(iconResId);
+        dest.writeString(category);
     }
 } 

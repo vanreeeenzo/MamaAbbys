@@ -220,6 +220,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
 
     public List<String> getAllCategories() {
         List<String> categories = new ArrayList<>();
+        categories.add("All Categories");
         categories.add("Purefoods");
         categories.add("Virginia Products");
         categories.add("Big Shot Products");
@@ -310,7 +311,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                         stockInfo += " (Low Stock!)";
                     }
 
-                    inventoryItems.add(new InventoryItem(id, name, stockInfo, R.drawable.ic_package));
+                    inventoryItems.add(new InventoryItem(id, name, stockInfo, R.drawable.ic_package, category));
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
@@ -353,5 +354,44 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         cursor.close();
         db.close();
         return result;
+    }
+
+    public List<InventoryItem> searchInventoryItems(String query) {
+        List<InventoryItem> inventoryItems = new ArrayList<>();
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        try {
+            db = this.getReadableDatabase();
+            String searchQuery = "SELECT " + COLUMN_ID + ", " + COLUMN_NAME + ", " + COLUMN_CATEGORY + ", " +
+                    COLUMN_QTY + ", " + COLUMN_PRICE + ", " + COLUMN_MIN_THRESHOLD + " FROM " + TABLE_INVENTORY +
+                    " WHERE " + COLUMN_NAME + " LIKE ? OR " + COLUMN_CATEGORY + " LIKE ?";
+            String searchPattern = "%" + query + "%";
+            cursor = db.rawQuery(searchQuery, new String[]{searchPattern, searchPattern});
+
+            if (cursor.moveToFirst()) {
+                do {
+                    String id = cursor.getString(0);
+                    String name = cursor.getString(1);
+                    String category = cursor.getString(2);
+                    int quantity = cursor.getInt(3);
+                    float price = cursor.getFloat(4);
+                    int minThreshold = cursor.getInt(5);
+                    String stockInfo = "In Stock: " + quantity + " | Price: ₱" + String.format("%.2f", price);
+
+                    if (quantity <= minThreshold) {
+                        stockInfo += " (Low Stock!)";
+                    }
+
+                    inventoryItems.add(new InventoryItem(id, name, stockInfo, R.drawable.ic_package, category));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in searchInventoryItems: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+        }
+        return inventoryItems;
     }
 }
