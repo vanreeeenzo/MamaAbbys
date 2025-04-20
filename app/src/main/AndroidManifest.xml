@@ -20,7 +20,7 @@
             android:label="Add Inventory"
             android:parentActivityName=".MainActivity" />
         <activity
-            android:name=".Login"
+            android:name=".AddDeliveryActivity"
             android:exported="true"
             android:label="Dashboard">
             <intent-filter>

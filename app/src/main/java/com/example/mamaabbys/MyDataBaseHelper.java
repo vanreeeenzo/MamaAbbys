@@ -20,7 +20,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
     private static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 2;
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
@@ -36,8 +36,17 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String COLUMN_EMAIL = "email";
     private static final String COLUMN_PASSWORD = "password";
 
+
+    public static final String TABLE_DELIVERY = "delivery";
+    public static final String COLUMN_IDD = "id";
+    public static final String COLUMN_ORDER = "order_description";
+    public static final String COLUMN_DATE = "delivery_date";
+    public static final String COLUMN_TIME = "delivery_time";
+
+
     private static final Map<String, Float> PRODUCT_PRICES = new HashMap<>();
     private static final Map<String, Integer> PRODUCT_THRESHOLDS = new HashMap<>();
+
 
     public MyDataBaseHelper(@Nullable Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -65,6 +74,16 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     COLUMN_PASSWORD + " TEXT)";
             db.execSQL(usersQuery);
 
+            String CREATE_DELIVERY_TABLE = "CREATE TABLE " + TABLE_DELIVERY + "(" +
+                    COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    COLUMN_ORDER + " TEXT," +
+                    COLUMN_DATE + " TEXT," +
+                    COLUMN_TIME + " TEXT" + ")";
+            db.execSQL(CREATE_DELIVERY_TABLE);
+
+
+
+
             Log.d(TAG, "Database tables created successfully");
         } catch (Exception e) {
             Log.e(TAG, "Error creating database tables: " + e.getMessage());
@@ -74,6 +93,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         try {
+
+            if (oldVersion < 3) {
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELIVERY);
+                onCreate(db);
+            }
+
+
             if (oldVersion < 2) {
                 db.execSQL("ALTER TABLE " + TABLE_INVENTORY + " ADD COLUMN " + COLUMN_CATEGORY + " TEXT");
                 Log.d(TAG, "Added category column");
@@ -202,7 +228,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 cv.put(COLUMN_MIN_THRESHOLD, min_threshold);
 
                 long result = db.insert(TABLE_INVENTORY, null, cv);
-                if(result == -1) {
+                if (result == -1) {
                     Toast.makeText(context, "Failed to add inventory", Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(context, "Added Successfully!", Toast.LENGTH_SHORT).show();
@@ -348,8 +374,8 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
 
     public boolean checkUser(String fullname, String password) {
         SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT * FROM " + TABLE_USERS + " WHERE " + COLUMN_FULLNAME + " = ? AND " + COLUMN_PASSWORD + " = ?", 
-            new String[]{fullname, password});
+        Cursor cursor = db.rawQuery("SELECT * FROM " + TABLE_USERS + " WHERE " + COLUMN_FULLNAME + " = ? AND " + COLUMN_PASSWORD + " = ?",
+                new String[]{fullname, password});
         boolean result = cursor.getCount() > 0;
         cursor.close();
         db.close();
@@ -394,4 +420,21 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
         return inventoryItems;
     }
+
+
+    public boolean addDelivery(Delivery delivery) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_ORDER, delivery.getOrderDescription());
+        values.put(COLUMN_DATE, delivery.getDeliveryDate());
+        values.put(COLUMN_TIME, delivery.getDeliveryTime());
+
+        long result = db.insert(TABLE_DELIVERY, null, values);
+        db.close();
+        return result != -1;
+    }
 }
+
+
+
+
