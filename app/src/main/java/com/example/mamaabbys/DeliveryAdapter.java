@@ -22,6 +22,11 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
         this.listener = listener;
     }
 
+    public void updateItems(List<DeliveryItem> newItems) {
+        this.items = newItems;
+        notifyDataSetChanged();
+    }
+
     @NonNull
     @Override
     public DeliveryViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {

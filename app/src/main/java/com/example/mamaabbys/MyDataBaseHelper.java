@@ -433,6 +433,38 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         db.close();
         return result != -1;
     }
+
+    public List<Delivery> getAllDeliveries() {
+        List<Delivery> deliveries = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            cursor = db.query(TABLE_DELIVERY, 
+                new String[]{COLUMN_IDD, COLUMN_ORDER, COLUMN_DATE, COLUMN_TIME},
+                null, null, null, null, null);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String id = cursor.getString(cursor.getColumnIndex(COLUMN_IDD));
+                    String order = cursor.getString(cursor.getColumnIndex(COLUMN_ORDER));
+                    String date = cursor.getString(cursor.getColumnIndex(COLUMN_DATE));
+                    String time = cursor.getString(cursor.getColumnIndex(COLUMN_TIME));
+                    
+                    Delivery delivery = new Delivery(order, date, time);
+                    deliveries.add(delivery);
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting deliveries: " + e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+            db.close();
+        }
+        return deliveries;
+    }
 }
 
 

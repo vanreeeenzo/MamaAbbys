@@ -73,8 +73,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupClickListeners() {
         fab.setOnClickListener(v -> {
-            if (viewPager.getCurrentItem() == 0) {
+            int currentPosition = viewPager.getCurrentItem();
+            if (currentPosition == 0) {
                 startActivity(new Intent(MainActivity.this, AddInventory.class));
+            } else if (currentPosition == 2) { // Delivery tab
+                startActivity(new Intent(MainActivity.this, AddDeliveryActivity.class));
             }
         });
 
@@ -94,6 +97,9 @@ public class MainActivity extends AppCompatActivity {
         if (position == 0) {
             fab.show();
             deleteAllButton.setVisibility(View.VISIBLE);
+        } else if (position == 2) { // Delivery tab
+            fab.hide();
+            deleteAllButton.setVisibility(View.GONE);
         } else {
             fab.hide();
             deleteAllButton.setVisibility(View.GONE);
