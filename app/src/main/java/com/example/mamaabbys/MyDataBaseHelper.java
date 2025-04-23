@@ -20,7 +20,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
     private static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
@@ -36,17 +36,15 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String COLUMN_EMAIL = "email";
     private static final String COLUMN_PASSWORD = "password";
 
-
-    public static final String TABLE_DELIVERY = "delivery";
-    public static final String COLUMN_IDD = "id";
-    public static final String COLUMN_ORDER = "order_description";
-    public static final String COLUMN_DATE = "delivery_date";
-    public static final String COLUMN_TIME = "delivery_time";
-
+    private static final String TABLE_DELIVERY = "delivery";
+    private static final String COLUMN_DELIVERY_ID = "id";
+    private static final String COLUMN_ORDER = "order_description";
+    private static final String COLUMN_DATE = "delivery_date";
+    private static final String COLUMN_TIME = "delivery_time";
+    private static final String COLUMN_STATUS = "status";
 
     private static final Map<String, Float> PRODUCT_PRICES = new HashMap<>();
     private static final Map<String, Integer> PRODUCT_THRESHOLDS = new HashMap<>();
-
 
     public MyDataBaseHelper(@Nullable Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -60,66 +58,59 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         try {
             String inventoryQuery = "CREATE TABLE " + TABLE_INVENTORY + "(" + COLUMN_ID +
                     " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    COLUMN_NAME + " TEXT, " +
-                    COLUMN_CATEGORY + " TEXT, " +
-                    COLUMN_QTY + " INTEGER, " +
-                    COLUMN_PRICE + " FLOAT, " +
-                    COLUMN_MIN_THRESHOLD + " INTEGER);";
+                    COLUMN_NAME + " TEXT NOT NULL, " +
+                    COLUMN_CATEGORY + " TEXT NOT NULL, " +
+                    COLUMN_QTY + " INTEGER DEFAULT 0, " +
+                    COLUMN_PRICE + " FLOAT NOT NULL, " +
+                    COLUMN_MIN_THRESHOLD + " INTEGER DEFAULT 10);";
             db.execSQL(inventoryQuery);
 
             String usersQuery = "CREATE TABLE " + TABLE_USERS + " (" +
                     COLUMN_USER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    COLUMN_FULLNAME + " TEXT, " +
-                    COLUMN_EMAIL + " TEXT, " +
-                    COLUMN_PASSWORD + " TEXT)";
+                    COLUMN_FULLNAME + " TEXT NOT NULL, " +
+                    COLUMN_EMAIL + " TEXT UNIQUE NOT NULL, " +
+                    COLUMN_PASSWORD + " TEXT NOT NULL)";
             db.execSQL(usersQuery);
 
-            String CREATE_DELIVERY_TABLE = "CREATE TABLE " + TABLE_DELIVERY + "(" +
-                    COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    COLUMN_ORDER + " TEXT," +
-                    COLUMN_DATE + " TEXT," +
-                    COLUMN_TIME + " TEXT" + ")";
-            db.execSQL(CREATE_DELIVERY_TABLE);
-
-
-
+            String deliveryQuery = "CREATE TABLE " + TABLE_DELIVERY + "(" +
+                    COLUMN_DELIVERY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    COLUMN_ORDER + " TEXT NOT NULL," +
+                    COLUMN_DATE + " TEXT NOT NULL," +
+                    COLUMN_TIME + " TEXT NOT NULL," +
+                    COLUMN_STATUS + " TEXT DEFAULT 'Pending')";
+            db.execSQL(deliveryQuery);
 
             Log.d(TAG, "Database tables created successfully");
         } catch (Exception e) {
             Log.e(TAG, "Error creating database tables: " + e.getMessage());
+            throw new RuntimeException("Failed to create database tables", e);
         }
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         try {
-
-            if (oldVersion < 3) {
-                db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELIVERY);
-                onCreate(db);
-            }
-
-
+            Log.d(TAG, "Upgrading database from version " + oldVersion + " to " + newVersion);
+            
             if (oldVersion < 2) {
                 db.execSQL("ALTER TABLE " + TABLE_INVENTORY + " ADD COLUMN " + COLUMN_CATEGORY + " TEXT");
-                Log.d(TAG, "Added category column");
+                Log.d(TAG, "Added category column to inventory table");
             }
+            
             if (oldVersion < 3) {
-                db.execSQL("DROP TABLE IF EXISTS " + TABLE_INVENTORY);
-                onCreate(db);
-                Log.d(TAG, "Recreated inventory table for version 3");
-            }
-            if (oldVersion < 4) {
-                String usersQuery = "CREATE TABLE " + TABLE_USERS + " (" +
-                        COLUMN_USER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                        COLUMN_FULLNAME + " TEXT, " +
-                        COLUMN_EMAIL + " TEXT, " +
-                        COLUMN_PASSWORD + " TEXT)";
-                db.execSQL(usersQuery);
-                Log.d(TAG, "Added users table for version 4");
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELIVERY);
+                String deliveryQuery = "CREATE TABLE " + TABLE_DELIVERY + "(" +
+                        COLUMN_DELIVERY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                        COLUMN_ORDER + " TEXT NOT NULL," +
+                        COLUMN_DATE + " TEXT NOT NULL," +
+                        COLUMN_TIME + " TEXT NOT NULL," +
+                        COLUMN_STATUS + " TEXT DEFAULT 'Pending')";
+                db.execSQL(deliveryQuery);
+                Log.d(TAG, "Recreated delivery table with status column");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error upgrading database: " + e.getMessage());
+            throw new RuntimeException("Failed to upgrade database", e);
         }
     }
 
@@ -421,47 +412,62 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return inventoryItems;
     }
 
-
     public boolean addDelivery(Delivery delivery) {
-        SQLiteDatabase db = this.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put(COLUMN_ORDER, delivery.getOrderDescription());
-        values.put(COLUMN_DATE, delivery.getDeliveryDate());
-        values.put(COLUMN_TIME, delivery.getDeliveryTime());
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            ContentValues values = new ContentValues();
+            values.put(COLUMN_ORDER, delivery.getOrderDescription());
+            values.put(COLUMN_DATE, delivery.getDeliveryDate());
+            values.put(COLUMN_TIME, delivery.getDeliveryTime());
+            values.put(COLUMN_STATUS, "Pending");
 
-        long result = db.insert(TABLE_DELIVERY, null, values);
-        db.close();
-        return result != -1;
+            long result = db.insert(TABLE_DELIVERY, null, values);
+            return result != -1;
+        } catch (Exception e) {
+            Log.e(TAG, "Error adding delivery: " + e.getMessage());
+            return false;
+        } finally {
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
     }
 
     public List<Delivery> getAllDeliveries() {
         List<Delivery> deliveries = new ArrayList<>();
-        SQLiteDatabase db = this.getReadableDatabase();
+        SQLiteDatabase db = null;
         Cursor cursor = null;
 
         try {
-            cursor = db.query(TABLE_DELIVERY, 
-                new String[]{COLUMN_IDD, COLUMN_ORDER, COLUMN_DATE, COLUMN_TIME},
-                null, null, null, null, null);
+            db = this.getReadableDatabase();
+            String query = "SELECT * FROM " + TABLE_DELIVERY + 
+                          " ORDER BY " + COLUMN_DATE + " DESC, " + COLUMN_TIME + " DESC";
+            cursor = db.rawQuery(query, null);
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {
-                    String id = cursor.getString(cursor.getColumnIndex(COLUMN_IDD));
+                    String id = cursor.getString(cursor.getColumnIndex(COLUMN_DELIVERY_ID));
                     String order = cursor.getString(cursor.getColumnIndex(COLUMN_ORDER));
                     String date = cursor.getString(cursor.getColumnIndex(COLUMN_DATE));
                     String time = cursor.getString(cursor.getColumnIndex(COLUMN_TIME));
+                    String status = cursor.getString(cursor.getColumnIndex(COLUMN_STATUS));
                     
                     Delivery delivery = new Delivery(order, date, time);
+                    delivery.setId(id);
+                    delivery.setStatus(status);
                     deliveries.add(delivery);
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
             Log.e(TAG, "Error getting deliveries: " + e.getMessage());
         } finally {
-            if (cursor != null) {
+            if (cursor != null && !cursor.isClosed()) {
                 cursor.close();
             }
-            db.close();
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
         }
         return deliveries;
     }
