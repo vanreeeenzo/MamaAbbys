@@ -1,5 +1,6 @@
 package com.example.mamaabbys;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -16,11 +17,13 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.util.ArrayList;
 import java.util.List;
 
+
 public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItemClickListener {
     private RecyclerView recyclerView;
     private DeliveryAdapter adapter;
     private MyDataBaseHelper myDB;
     private SwipeRefreshLayout swipeRefreshLayout;
+    private Context context;
 
     @Nullable
     @Override
@@ -31,47 +34,44 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        
+
         myDB = new MyDataBaseHelper(getContext());
         recyclerView = view.findViewById(R.id.deliveryRecyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        
-        // Setup SwipeRefreshLayout
+
         swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
         swipeRefreshLayout.setOnRefreshListener(this::loadDeliveries);
-        
-        // Setup Floating Action Button
+
         FloatingActionButton fabAdd = view.findViewById(R.id.fabAdd);
         fabAdd.setOnClickListener(v -> {
             Intent intent = new Intent(getActivity(), AddDeliveryActivity.class);
             startActivity(intent);
         });
-        
-        // Load initial deliveries
+
         loadDeliveries();
     }
 
     private void loadDeliveries() {
         List<DeliveryItem> items = new ArrayList<>();
         List<Delivery> deliveries = myDB.getAllDeliveries();
-        
+
         for (Delivery delivery : deliveries) {
             String schedule = "Scheduled for " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime();
             items.add(new DeliveryItem(
-                delivery.getOrderDescription(),
-                delivery.getOrderDescription(),
-                schedule,
-                R.drawable.ic_truck
+                    delivery.getId(),
+                    delivery.getOrderDescription(),
+                    schedule,
+                    R.drawable.ic_truck
             ));
         }
-        
+
         if (adapter == null) {
-            adapter = new DeliveryAdapter(items, this);
+            adapter = new DeliveryAdapter(getContext(), items, this);
             recyclerView.setAdapter(adapter);
         } else {
             adapter.updateItems(items);
         }
-        
+
         if (swipeRefreshLayout != null) {
             swipeRefreshLayout.setRefreshing(false);
         }
@@ -83,9 +83,31 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
     }
 
     @Override
+    public void onMarkAsDoneClicked(DeliveryItem delivery) {
+        boolean isDeleted = myDB.deleteDelivery(delivery.getId());
+        if (isDeleted) {
+            Toast.makeText(getContext(), "Delivery marked as done and deleted", Toast.LENGTH_SHORT).show();
+            loadDeliveries();
+        } else {
+            Toast.makeText(getContext(), "Failed to delete delivery", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void onCancelClicked(DeliveryItem delivery) {
+        boolean isDeleted = myDB.deleteDelivery(delivery.getId());
+        if (isDeleted) {
+            Toast.makeText(getContext(), "Delivery canceled and deleted", Toast.LENGTH_SHORT).show();
+            loadDeliveries();
+        } else {
+            Toast.makeText(getContext(), "Failed to delete delivery", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
-        loadDeliveries(); // Refresh the list when returning from AddDeliveryActivity
+        loadDeliveries();
     }
 
     @Override
@@ -95,4 +117,12 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
             myDB.close();
         }
     }
-} 
+}
+
+
+
+
+
+
+
+

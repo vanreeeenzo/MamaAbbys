@@ -12,6 +12,7 @@ public class Delivery {
         this.deliveryDate = deliveryDate;
         this.deliveryTime = deliveryTime;
         this.status = "Pending"; // Default status
+
     }
 
     public String getId() {

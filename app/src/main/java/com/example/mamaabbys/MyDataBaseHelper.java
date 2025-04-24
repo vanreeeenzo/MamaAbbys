@@ -91,12 +91,12 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         try {
             Log.d(TAG, "Upgrading database from version " + oldVersion + " to " + newVersion);
-            
+
             if (oldVersion < 2) {
                 db.execSQL("ALTER TABLE " + TABLE_INVENTORY + " ADD COLUMN " + COLUMN_CATEGORY + " TEXT");
                 Log.d(TAG, "Added category column to inventory table");
             }
-            
+
             if (oldVersion < 3) {
                 db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELIVERY);
                 String deliveryQuery = "CREATE TABLE " + TABLE_DELIVERY + "(" +
@@ -441,8 +441,8 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
 
         try {
             db = this.getReadableDatabase();
-            String query = "SELECT * FROM " + TABLE_DELIVERY + 
-                          " ORDER BY " + COLUMN_DATE + " DESC, " + COLUMN_TIME + " DESC";
+            String query = "SELECT * FROM " + TABLE_DELIVERY +
+                    " ORDER BY " + COLUMN_DATE + " DESC, " + COLUMN_TIME + " DESC";
             cursor = db.rawQuery(query, null);
 
             if (cursor != null && cursor.moveToFirst()) {
@@ -452,7 +452,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     String date = cursor.getString(cursor.getColumnIndex(COLUMN_DATE));
                     String time = cursor.getString(cursor.getColumnIndex(COLUMN_TIME));
                     String status = cursor.getString(cursor.getColumnIndex(COLUMN_STATUS));
-                    
+
                     Delivery delivery = new Delivery(order, date, time);
                     delivery.setId(id);
                     delivery.setStatus(status);
@@ -471,8 +471,22 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
         return deliveries;
     }
-}
 
+
+    public boolean deleteDelivery(String deliveryId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            int result = db.delete(TABLE_DELIVERY, COLUMN_DELIVERY_ID + " = ?", new String[]{deliveryId});
+            return result > 0;
+        } catch (Exception e) {
+            Log.e("MyDataBaseHelper", "Error deleting delivery: " + e.getMessage());
+            return false;
+        } finally {
+            db.close();
+        }
+    }
+
+}
 
 
 

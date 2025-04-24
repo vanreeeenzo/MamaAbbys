@@ -28,4 +28,4 @@ public class DeliveryItem {
     public int getIconResId() {
         return iconResId;
     }
-} 
+}
