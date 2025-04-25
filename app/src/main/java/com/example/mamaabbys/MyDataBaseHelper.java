@@ -460,17 +460,18 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting deliveries: " + e.getMessage());
+
         } finally {
-            if (cursor != null && !cursor.isClosed()) {
+            if (cursor != null) {
                 cursor.close();
             }
-            if (db != null && db.isOpen()) {
+            if (db != null) {
                 db.close();
             }
         }
         return deliveries;
     }
+
 
 
     public boolean deleteDelivery(String deliveryId) {
@@ -479,12 +480,31 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             int result = db.delete(TABLE_DELIVERY, COLUMN_DELIVERY_ID + " = ?", new String[]{deliveryId});
             return result > 0;
         } catch (Exception e) {
-            Log.e("MyDataBaseHelper", "Error deleting delivery: " + e.getMessage());
             return false;
         } finally {
             db.close();
         }
     }
+
+    public boolean updateDeliveryStatus(String deliveryId, boolean isDone) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("isDone", isDone ? 1 : 0);
+
+        try {
+            int rowsAffected = db.update(TABLE_DELIVERY, values, COLUMN_DELIVERY_ID + " = ?", new String[]{deliveryId});
+            return rowsAffected > 0;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (db != null) {
+                db.close();
+            }
+        }
+    }
+
+
+
 
 }
 

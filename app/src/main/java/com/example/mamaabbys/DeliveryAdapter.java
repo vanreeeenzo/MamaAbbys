@@ -8,6 +8,7 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 
@@ -33,6 +34,16 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
         notifyDataSetChanged();
     }
 
+    public void markAsDone(DeliveryItem item) {
+
+        items.remove(item);
+        item.setDone(true);
+        items.add(item);
+
+        items.sort((a, b) -> Boolean.compare(a.isDone(), b.isDone()));
+        notifyDataSetChanged();
+    }
+
     @NonNull
     @Override
     public DeliveryViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -47,12 +58,24 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
         holder.schedule.setText(item.getSchedule());
         holder.deliveryIcon.setImageResource(item.getIconResId());
 
+        if (item.isDone()) {
+            holder.itemView.setBackgroundColor(ContextCompat.getColor(context, R.color.gray));
+            holder.btnMarkAsDone.setVisibility(View.GONE);
+            holder.btnCancelDelivery.setText("Delete");
+            holder.btnCancelDelivery.setOnClickListener(v -> {
+                if (listener != null) listener.onCancelClicked(item);
+            });
+        } else {
+            holder.itemView.setBackgroundColor(ContextCompat.getColor(context, R.color.white));
+            holder.btnMarkAsDone.setVisibility(View.VISIBLE);
+            holder.btnCancelDelivery.setText("Cancel");
+            holder.btnCancelDelivery.setOnClickListener(v -> {
+                if (listener != null) listener.onCancelClicked(item);
+            });
+        }
+
         holder.btnMarkAsDone.setOnClickListener(v -> {
             if (listener != null) listener.onMarkAsDoneClicked(item);
-        });
-
-        holder.btnCancelDelivery.setOnClickListener(v -> {
-            if (listener != null) listener.onCancelClicked(item);
         });
 
         holder.itemView.setOnClickListener(v -> {
@@ -80,5 +103,3 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
         }
     }
 }
-
-

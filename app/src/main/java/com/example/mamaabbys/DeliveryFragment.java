@@ -3,6 +3,7 @@ package com.example.mamaabbys;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,8 +16,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-
+import java.util.Map;
 
 public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItemClickListener {
     private RecyclerView recyclerView;
@@ -24,6 +26,7 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
     private MyDataBaseHelper myDB;
     private SwipeRefreshLayout swipeRefreshLayout;
     private Context context;
+    private Map<String, Boolean> doneMap = new HashMap<>();
 
     @Nullable
     @Override
@@ -57,13 +60,20 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
 
         for (Delivery delivery : deliveries) {
             String schedule = "Scheduled for " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime();
-            items.add(new DeliveryItem(
+            DeliveryItem item = new DeliveryItem(
                     delivery.getId(),
                     delivery.getOrderDescription(),
                     schedule,
                     R.drawable.ic_truck
-            ));
+            );
+
+
+            item.setDone(delivery.isDone());
+            items.add(item);
         }
+
+        // Sort: done items at the bottom
+        items.sort((a, b) -> Boolean.compare(a.isDone(), b.isDone()));
 
         if (adapter == null) {
             adapter = new DeliveryAdapter(getContext(), items, this);
@@ -84,20 +94,23 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
 
     @Override
     public void onMarkAsDoneClicked(DeliveryItem delivery) {
-        boolean isDeleted = myDB.deleteDelivery(delivery.getId());
-        if (isDeleted) {
-            Toast.makeText(getContext(), "Delivery marked as done and deleted", Toast.LENGTH_SHORT).show();
-            loadDeliveries();
+        boolean isUpdated = myDB.updateDeliveryStatus(delivery.getId(), true);
+        if (isUpdated) {
+            doneMap.put(delivery.getId(), true);
+            delivery.setDone(true);
+            adapter.markAsDone(delivery);
         } else {
-            Toast.makeText(getContext(), "Failed to delete delivery", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Failed to mark delivery as done", Toast.LENGTH_SHORT).show();
         }
     }
+
+
 
     @Override
     public void onCancelClicked(DeliveryItem delivery) {
         boolean isDeleted = myDB.deleteDelivery(delivery.getId());
         if (isDeleted) {
-            Toast.makeText(getContext(), "Delivery canceled and deleted", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Delivery details deleted", Toast.LENGTH_SHORT).show();
             loadDeliveries();
         } else {
             Toast.makeText(getContext(), "Failed to delete delivery", Toast.LENGTH_SHORT).show();
@@ -118,11 +131,3 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
         }
     }
 }
-
-
-
-
-
-
-
-

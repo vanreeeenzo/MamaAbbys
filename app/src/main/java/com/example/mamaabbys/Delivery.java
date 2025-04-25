@@ -6,6 +6,7 @@ public class Delivery {
     private String deliveryDate;
     private String deliveryTime;
     private String status;
+    private boolean isDone;
 
     public Delivery(String orderDescription, String deliveryDate, String deliveryTime) {
         this.orderDescription = orderDescription;
@@ -53,5 +54,13 @@ public class Delivery {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public boolean isDone() {
+        return isDone;
+    }
+
+    public void setDone(boolean done) {
+        isDone = done;
     }
 }
