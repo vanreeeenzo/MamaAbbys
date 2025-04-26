@@ -489,7 +489,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     public boolean updateDeliveryStatus(String deliveryId, boolean isDone) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
-        values.put("isDone", isDone ? 1 : 0);
+        values.put(COLUMN_STATUS, isDone ? "Done" : "Pending");
 
         try {
             int rowsAffected = db.update(TABLE_DELIVERY, values, COLUMN_DELIVERY_ID + " = ?", new String[]{deliveryId});
@@ -502,6 +502,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             }
         }
     }
+
 
 
 

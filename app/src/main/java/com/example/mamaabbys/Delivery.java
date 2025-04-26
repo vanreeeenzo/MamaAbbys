@@ -57,8 +57,9 @@ public class Delivery {
     }
 
     public boolean isDone() {
-        return isDone;
+        return "Done".equalsIgnoreCase(status);
     }
+
 
     public void setDone(boolean done) {
         isDone = done;
