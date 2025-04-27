@@ -460,7 +460,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
-
+            e.printStackTrace();
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -471,7 +471,6 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
         return deliveries;
     }
-
 
 
     public boolean deleteDelivery(String deliveryId) {

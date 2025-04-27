@@ -1,10 +1,13 @@
 package com.example.mamaabbys;
 
+import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -26,6 +29,9 @@ public class MainActivity extends AppCompatActivity {
     private FloatingActionButton fab;
     private MaterialButton deleteAllButton;
     private MyDataBaseHelper dbHelper;
+    private ImageButton notificationButton;
+    private TextView notificationBadge;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,12 +42,15 @@ public class MainActivity extends AppCompatActivity {
         setupViewPager();
         setupClickListeners();
         setupPageChangeListener();
-
+        setupNotificationButton();
         // Initialize Firebase (if needed)
         FirebaseDatabase.getInstance().getReference().child("Inventory").child("Meat").setValue("TJ Hotdog");
     }
 
+
     private void initializeViews() {
+        notificationButton = findViewById(R.id.notificationButton);
+        notificationBadge = findViewById(R.id.notificationBadge);
         viewPager = findViewById(R.id.viewPager);
         tabLayout = findViewById(R.id.tabLayout);
         fab = findViewById(R.id.quickActionsBar);
@@ -150,4 +159,12 @@ public class MainActivity extends AppCompatActivity {
         viewPager.setCurrentItem(position, false);
         updateUIForPosition(position);
     }
+    private void setupNotificationButton() {
+        notificationButton.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, NotificationActivity.class);
+            startActivity(intent);
+        });
+    }
+
 }
+

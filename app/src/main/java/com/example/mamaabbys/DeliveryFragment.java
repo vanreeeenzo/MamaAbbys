@@ -10,6 +10,8 @@ import android.view.ViewGroup;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -121,7 +123,14 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
     public void onResume() {
         super.onResume();
         loadDeliveries();
+
+        // New code to check notifications
+        if (myDB != null) {
+            List<Delivery> deliveries = myDB.getAllDeliveries();
+            DeliveryChecker.checkDeliveries(getContext(), deliveries);
+        }
     }
+
 
     @Override
     public void onDestroy() {
@@ -130,4 +139,21 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
             myDB.close();
         }
     }
+    private void checkAndNotifyDeliveries() {
+        List<Delivery> deliveries = myDB.getAllDeliveries();
+
+        for (Delivery delivery : deliveries) {
+            // Check if delivery date is 7 days, 3 days, 1 day or today
+            // If yes -> build a notification
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), "your_channel_id")
+                    .setSmallIcon(R.drawable.ic_truck)
+                    .setContentTitle("Upcoming Delivery")
+                    .setContentText("Your order " + delivery.getOrderDescription() + " is coming soon!")
+                    .setPriority(NotificationCompat.PRIORITY_HIGH);
+
+            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getContext());
+            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+        }
+    }
+
 }
