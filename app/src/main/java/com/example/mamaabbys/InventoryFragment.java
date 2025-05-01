@@ -61,7 +61,7 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
         setupSwipeRefresh();
         
         if (savedInstanceState != null) {
-            // Restore state if available
+
             currentItems = savedInstanceState.getParcelableArrayList(KEY_ITEMS);
             if (currentItems != null) {
                 updateAdapter(currentItems);

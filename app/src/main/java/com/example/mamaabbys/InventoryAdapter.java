@@ -15,6 +15,8 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.Inve
 
     public interface OnItemClickListener {
         void onItemClick(InventoryItem item);
+
+
     }
 
     public InventoryAdapter(List<InventoryItem> items, OnItemClickListener listener) {

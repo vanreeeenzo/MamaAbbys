@@ -19,6 +19,7 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
 
     public interface OnItemClickListener {
         void onItemClick(DeliveryItem item);
+
         void onMarkAsDoneClicked(DeliveryItem delivery);
         void onCancelClicked(DeliveryItem delivery);
     }
@@ -35,7 +36,6 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
     }
 
     public void markAsDone(DeliveryItem item) {
-
         items.remove(item);
         item.setDone(true);
         items.add(item);
@@ -76,10 +76,6 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
 
         holder.btnMarkAsDone.setOnClickListener(v -> {
             if (listener != null) listener.onMarkAsDoneClicked(item);
-        });
-
-        holder.itemView.setOnClickListener(v -> {
-            if (listener != null) listener.onItemClick(item);
         });
     }
 

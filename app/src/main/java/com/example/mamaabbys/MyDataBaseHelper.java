@@ -20,7 +20,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
     private static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
@@ -42,6 +42,10 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String COLUMN_DATE = "delivery_date";
     private static final String COLUMN_TIME = "delivery_time";
     private static final String COLUMN_STATUS = "status";
+
+    private static final String TABLE_DELETED_NOTIFICATIONS = "deleted_notifications";
+    private static final String COLUMN_NOTIFICATION_ID = "notification_id";
+    private static final String COLUMN_DELETED_AT = "deleted_at";
 
     private static final Map<String, Float> PRODUCT_PRICES = new HashMap<>();
     private static final Map<String, Integer> PRODUCT_THRESHOLDS = new HashMap<>();
@@ -80,6 +84,12 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     COLUMN_STATUS + " TEXT DEFAULT 'Pending')";
             db.execSQL(deliveryQuery);
 
+            String createDeletedNotificationsTable = "CREATE TABLE " + TABLE_DELETED_NOTIFICATIONS + " (" +
+                    COLUMN_NOTIFICATION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    COLUMN_DELIVERY_ID + " TEXT NOT NULL," +
+                    COLUMN_DELETED_AT + " INTEGER NOT NULL)";
+            db.execSQL(createDeletedNotificationsTable);
+
             Log.d(TAG, "Database tables created successfully");
         } catch (Exception e) {
             Log.e(TAG, "Error creating database tables: " + e.getMessage());
@@ -107,6 +117,15 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                         COLUMN_STATUS + " TEXT DEFAULT 'Pending')";
                 db.execSQL(deliveryQuery);
                 Log.d(TAG, "Recreated delivery table with status column");
+            }
+
+            if (oldVersion < 4) {
+                String createDeletedNotificationsTable = "CREATE TABLE " + TABLE_DELETED_NOTIFICATIONS + " (" +
+                        COLUMN_NOTIFICATION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                        COLUMN_DELIVERY_ID + " TEXT NOT NULL," +
+                        COLUMN_DELETED_AT + " INTEGER NOT NULL)";
+                db.execSQL(createDeletedNotificationsTable);
+                Log.d(TAG, "Created deleted notifications table");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error upgrading database: " + e.getMessage());
@@ -472,7 +491,6 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return deliveries;
     }
 
-
     public boolean deleteDelivery(String deliveryId) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
@@ -502,10 +520,45 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    public boolean markNotificationAsDeleted(String deliveryId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            ContentValues values = new ContentValues();
+            values.put(COLUMN_DELIVERY_ID, deliveryId);
+            values.put(COLUMN_DELETED_AT, System.currentTimeMillis());
 
+            long result = db.insert(TABLE_DELETED_NOTIFICATIONS, null, values);
+            return result != -1;
+        } catch (Exception e) {
+            Log.e(TAG, "Error marking notification as deleted: " + e.getMessage());
+            return false;
+        } finally {
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+    }
 
-
-
+    public boolean isNotificationDeleted(String deliveryId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            String query = "SELECT * FROM " + TABLE_DELETED_NOTIFICATIONS +
+                    " WHERE " + COLUMN_DELIVERY_ID + " = ?";
+            cursor = db.rawQuery(query, new String[]{deliveryId});
+            return cursor != null && cursor.getCount() > 0;
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking deleted notification: " + e.getMessage());
+            return false;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+    }
 }
 
 
