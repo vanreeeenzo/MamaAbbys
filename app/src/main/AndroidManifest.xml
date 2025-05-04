@@ -24,6 +24,10 @@
             android:name=".NotificationActivity"
             android:label="Notification Page"
             android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".DeliveryDetailsActivity"
+            android:label="Delivery Details"
+            android:parentActivityName=".NotificationActivity" />
 
         <activity
             android:name=".AddDeliveryActivity"

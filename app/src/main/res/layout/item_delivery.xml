@@ -14,8 +14,8 @@
 
         <ImageView
             android:id="@+id/deliveryIcon"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:src="@drawable/ic_truck"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -48,27 +48,30 @@
         <Button
             android:id="@+id/btnMarkAsDone"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="36dp"
             android:text="Mark as Done"
+            android:textSize="13sp"
+            android:textColor="@android:color/white"
+            android:backgroundTint="@android:color/holo_green_dark"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="8dp"
             app:layout_constraintTop_toBottomOf="@id/schedule"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/btnCancelDelivery"
-
-            android:layout_marginTop="12dp"
-            android:layout_marginEnd="8dp" />
+            app:layout_constraintEnd_toStartOf="@id/btnCancelDelivery" />
 
         <Button
             android:id="@+id/btnCancelDelivery"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="36dp"
             android:text="Cancel Delivery"
+            android:textSize="13sp"
             android:textColor="@android:color/white"
             android:backgroundTint="@android:color/holo_red_dark"
+            android:layout_marginTop="12dp"
+            android:layout_marginStart="8dp"
             app:layout_constraintTop_toBottomOf="@id/schedule"
             app:layout_constraintStart_toEndOf="@id/btnMarkAsDone"
-            app:layout_constraintEnd_toEndOf="parent"
-            android:layout_marginTop="12dp"
-            android:layout_marginStart="8dp" />
+            app:layout_constraintEnd_toEndOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.cardview.widget.CardView>

@@ -20,7 +20,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
     private static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5;
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
@@ -44,8 +44,10 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String COLUMN_STATUS = "status";
 
     private static final String TABLE_DELETED_NOTIFICATIONS = "deleted_notifications";
+    private static final String TABLE_READ_NOTIFICATIONS = "read_notifications";
     private static final String COLUMN_NOTIFICATION_ID = "notification_id";
     private static final String COLUMN_DELETED_AT = "deleted_at";
+    private static final String COLUMN_READ_AT = "read_at";
 
     private static final Map<String, Float> PRODUCT_PRICES = new HashMap<>();
     private static final Map<String, Integer> PRODUCT_THRESHOLDS = new HashMap<>();
@@ -90,6 +92,11 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     COLUMN_DELETED_AT + " INTEGER NOT NULL)";
             db.execSQL(createDeletedNotificationsTable);
 
+            String createReadNotificationsTable = "CREATE TABLE " + TABLE_READ_NOTIFICATIONS + " (" +
+                    COLUMN_NOTIFICATION_ID + " TEXT PRIMARY KEY," +
+                    COLUMN_READ_AT + " INTEGER NOT NULL)";
+            db.execSQL(createReadNotificationsTable);
+
             Log.d(TAG, "Database tables created successfully");
         } catch (Exception e) {
             Log.e(TAG, "Error creating database tables: " + e.getMessage());
@@ -126,6 +133,14 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                         COLUMN_DELETED_AT + " INTEGER NOT NULL)";
                 db.execSQL(createDeletedNotificationsTable);
                 Log.d(TAG, "Created deleted notifications table");
+            }
+
+            if (oldVersion < 5) {
+                String createReadNotificationsTable = "CREATE TABLE " + TABLE_READ_NOTIFICATIONS + " (" +
+                        COLUMN_NOTIFICATION_ID + " TEXT PRIMARY KEY," +
+                        COLUMN_READ_AT + " INTEGER NOT NULL)";
+                db.execSQL(createReadNotificationsTable);
+                Log.d(TAG, "Created read notifications table");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error upgrading database: " + e.getMessage());
@@ -549,6 +564,78 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             return cursor != null && cursor.getCount() > 0;
         } catch (Exception e) {
             Log.e(TAG, "Error checking deleted notification: " + e.getMessage());
+            return false;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+    }
+
+    public Delivery getDeliveryById(String deliveryId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            String query = "SELECT * FROM " + TABLE_DELIVERY + " WHERE " + COLUMN_DELIVERY_ID + " = ?";
+            cursor = db.rawQuery(query, new String[]{deliveryId});
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                String id = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DELIVERY_ID));
+                String orderDescription = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER));
+                String deliveryDate = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DATE));
+                String deliveryTime = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TIME));
+                
+                Delivery delivery = new Delivery(orderDescription, deliveryDate, deliveryTime);
+                delivery.setId(id);
+                return delivery;
+            }
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting delivery by ID: " + e.getMessage());
+            return null;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+    }
+
+    public boolean markNotificationAsRead(String notificationId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            ContentValues values = new ContentValues();
+            values.put(COLUMN_NOTIFICATION_ID, notificationId);
+            values.put(COLUMN_READ_AT, System.currentTimeMillis());
+
+            long result = db.insertWithOnConflict(TABLE_READ_NOTIFICATIONS, null, values, 
+                    SQLiteDatabase.CONFLICT_REPLACE);
+            return result != -1;
+        } catch (Exception e) {
+            Log.e(TAG, "Error marking notification as read: " + e.getMessage());
+            return false;
+        } finally {
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+    }
+
+    public boolean isNotificationRead(String notificationId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            String query = "SELECT * FROM " + TABLE_READ_NOTIFICATIONS +
+                    " WHERE " + COLUMN_NOTIFICATION_ID + " = ?";
+            cursor = db.rawQuery(query, new String[]{notificationId});
+            return cursor != null && cursor.getCount() > 0;
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking read notification: " + e.getMessage());
             return false;
         } finally {
             if (cursor != null) {

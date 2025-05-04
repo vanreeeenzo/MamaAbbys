@@ -12,7 +12,10 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class NotificationActivity extends AppCompatActivity implements NotificationAdapter.OnNotificationDeleteListener {
+public class NotificationActivity extends AppCompatActivity implements 
+    NotificationAdapter.OnNotificationDeleteListener,
+    NotificationAdapter.OnNotificationReadListener {
+
     private MyDataBaseHelper myDB;
     private RecyclerView recyclerView;
     private NotificationAdapter adapter;
@@ -29,7 +32,7 @@ public class NotificationActivity extends AppCompatActivity implements Notificat
         // Setup RecyclerView
         recyclerView = findViewById(R.id.notificationsRecyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new NotificationAdapter(notificationItems, this);
+        adapter = new NotificationAdapter(notificationItems, this, this);
         recyclerView.setAdapter(adapter);
 
         // Load and check deliveries
@@ -62,14 +65,17 @@ public class NotificationActivity extends AppCompatActivity implements Notificat
                 }
 
                 if (!notificationTitle.isEmpty() && !notificationMessage.isEmpty()) {
+                    boolean isRead = myDB.isNotificationRead(delivery.getId());
                     NotificationItem notificationItem = new NotificationItem(
                         delivery.getId(),
                         notificationTitle,
                         notificationMessage,
                         delivery.getDeliveryDate(),
                         delivery.getDeliveryTime(),
-                        orderDetails
+                        orderDetails,
+                        true // This is a delivery notification
                     );
+                    notificationItem.setRead(isRead);
                     notificationItems.add(notificationItem);
                     
                     // Show system notification
@@ -79,6 +85,17 @@ public class NotificationActivity extends AppCompatActivity implements Notificat
                 e.printStackTrace();
             }
         }
+
+        // Sort notifications: unread first, then read
+        notificationItems.sort((a, b) -> {
+            if (a.isRead() == b.isRead()) {
+                // If both are read or both are unread, sort by timestamp (newest first)
+                return Long.compare(b.getTimestamp(), a.getTimestamp());
+            }
+            // Unread notifications come first
+            return Boolean.compare(a.isRead(), b.isRead());
+        });
+
         adapter.updateNotifications(notificationItems);
     }
 
@@ -120,6 +137,23 @@ public class NotificationActivity extends AppCompatActivity implements Notificat
         if (myDB.markNotificationAsDeleted(notification.getId())) {
             // Remove from current list
             notificationItems.remove(notification);
+            adapter.updateNotifications(notificationItems);
+        }
+    }
+
+    @Override
+    public void onMarkAsRead(NotificationItem notification) {
+        // Mark notification as read in database
+        if (myDB.markNotificationAsRead(notification.getId())) {
+            // Update local state
+            notification.setRead(true);
+            // Re-sort the list
+            notificationItems.sort((a, b) -> {
+                if (a.isRead() == b.isRead()) {
+                    return Long.compare(b.getTimestamp(), a.getTimestamp());
+                }
+                return Boolean.compare(a.isRead(), b.isRead());
+            });
             adapter.updateNotifications(notificationItems);
         }
     }
