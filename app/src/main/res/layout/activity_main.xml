@@ -52,15 +52,15 @@
 
         <TextView
             android:id="@+id/notificationBadge"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="15dp"
+            android:layout_height="15dp"
             android:background="@drawable/circle_red"
             android:gravity="center"
-            android:text="3"
             android:textColor="@color/white"
             android:textSize="12sp"
             app:layout_constraintEnd_toEndOf="@id/notificationButton"
-            app:layout_constraintTop_toTopOf="@id/notificationButton" />
+            app:layout_constraintTop_toTopOf="@id/notificationButton"
+            android:visibility="gone" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
