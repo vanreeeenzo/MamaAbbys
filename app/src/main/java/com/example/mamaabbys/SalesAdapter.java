@@ -49,6 +49,11 @@ public class SalesAdapter extends RecyclerView.Adapter<SalesAdapter.SalesViewHol
         return items.size();
     }
 
+    public void updateItems(List<SalesItem> newItems) {
+        this.items = newItems;
+        notifyDataSetChanged();
+    }
+
     static class SalesViewHolder extends RecyclerView.ViewHolder {
         TextView salesTitle;
         TextView salesAmount;

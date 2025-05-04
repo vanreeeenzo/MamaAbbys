@@ -43,8 +43,23 @@ public class MainActivity extends AppCompatActivity {
         setupClickListeners();
         setupPageChangeListener();
         setupNotificationButton();
-        // Initialize Firebase (if needed)
-        FirebaseDatabase.getInstance().getReference().child("Inventory").child("Meat").setValue("TJ Hotdog");
+        
+        // Initialize Firebase in background
+        new Thread(() -> {
+            try {
+                FirebaseDatabase.getInstance().getReference()
+                    .child("Inventory")
+                    .child("Meat")
+                    .setValue("TJ Hotdog")
+                    .addOnCompleteListener(task -> {
+                        if (!task.isSuccessful()) {
+                            Log.e(TAG, "Firebase operation failed: " + task.getException());
+                        }
+                    });
+            } catch (Exception e) {
+                Log.e(TAG, "Error initializing Firebase: " + e.getMessage());
+            }
+        }).start();
     }
 
 

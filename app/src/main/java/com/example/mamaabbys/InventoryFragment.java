@@ -1,5 +1,6 @@
 package com.example.mamaabbys;
 
+import android.app.AlertDialog;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -35,6 +36,7 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
     private Spinner categoriesSpinner;
     private Spinner productsSpinner;
     private Map<String, List<String>> productCategories;
+    private volatile boolean isLoading = false;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -94,7 +96,11 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
 
     private void setupRecyclerView() {
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
-        adapter = new InventoryAdapter(null, this);
+        adapter = new InventoryAdapter(
+            new ArrayList<>(),
+            this,
+            item -> showSellDialog(item)
+        );
         recyclerView.setAdapter(adapter);
     }
 
@@ -103,50 +109,77 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
     }
 
     public void loadInventoryData() {
-        try {
-            List<InventoryItem> allItems = dbHelper.getAllInventoryItems();
-            
-            // Check if spinners are initialized and have selections
-            if (categoriesSpinner == null || productsSpinner == null || 
-                categoriesSpinner.getSelectedItem() == null || 
-                productsSpinner.getSelectedItem() == null) {
-                // If spinners are not ready, show all items
-                currentItems = allItems;
-                updateAdapter(allItems);
-                return;
-            }
-
-            String selectedCategory = categoriesSpinner.getSelectedItem().toString();
-            String selectedProduct = productsSpinner.getSelectedItem().toString();
-
-            // Filter items based on selected category and product
-            List<InventoryItem> filteredItems = new ArrayList<>();
-            
-            if (selectedCategory.equals("All Categories")) {
-                // If "All Categories" is selected, show all items
-                currentItems = allItems;
-                updateAdapter(allItems);
-                return;
-            }
-
-            for (InventoryItem item : allItems) {
-                // Check if the item matches both the selected category and product
-                if (item.getCategory().equals(selectedCategory) && 
-                    item.getName().equals(selectedProduct)) {
-                    filteredItems.add(item);
-                }
-            }
-
-            currentItems = filteredItems;
-            updateAdapter(filteredItems);
-            
-            if (swipeRefreshLayout != null && swipeRefreshLayout.isRefreshing()) {
-                swipeRefreshLayout.setRefreshing(false);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading inventory data: " + e.getMessage());
-            showErrorToast("Error loading inventory: " + e.getMessage());
+        if (isLoading) return;
+        isLoading = true;
+        if (swipeRefreshLayout != null) {
+            swipeRefreshLayout.setRefreshing(true);
         }
+
+        new Thread(() -> {
+            try {
+                List<InventoryItem> allItems = dbHelper.getAllInventoryItems();
+                
+                // Check if spinners are initialized and have selections
+                if (categoriesSpinner == null || productsSpinner == null || 
+                    categoriesSpinner.getSelectedItem() == null || 
+                    productsSpinner.getSelectedItem() == null) {
+                    // If spinners are not ready, show all items
+                    currentItems = allItems;
+                    requireActivity().runOnUiThread(() -> {
+                        updateAdapter(allItems);
+                        if (swipeRefreshLayout != null) {
+                            swipeRefreshLayout.setRefreshing(false);
+                        }
+                        isLoading = false;
+                    });
+                    return;
+                }
+
+                String selectedCategory = categoriesSpinner.getSelectedItem().toString();
+                String selectedProduct = productsSpinner.getSelectedItem().toString();
+
+                List<InventoryItem> filteredItems = new ArrayList<>();
+
+                // If "All Categories" or "All Products" is selected, show all items
+                if (selectedCategory.equals("All Categories") || selectedProduct.equals("All Products")) {
+                    currentItems = allItems;
+                    requireActivity().runOnUiThread(() -> {
+                        updateAdapter(allItems);
+                        if (swipeRefreshLayout != null) {
+                            swipeRefreshLayout.setRefreshing(false);
+                        }
+                        isLoading = false;
+                    });
+                    return;
+                }
+
+                for (InventoryItem item : allItems) {
+                    // Check if the item matches both the selected category and product
+                    if (item.getCategory().equals(selectedCategory) && 
+                        item.getName().equals(selectedProduct)) {
+                        filteredItems.add(item);
+                    }
+                }
+
+                currentItems = filteredItems;
+                requireActivity().runOnUiThread(() -> {
+                    updateAdapter(filteredItems);
+                    if (swipeRefreshLayout != null) {
+                        swipeRefreshLayout.setRefreshing(false);
+                    }
+                    isLoading = false;
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading inventory data: " + e.getMessage());
+                requireActivity().runOnUiThread(() -> {
+                    showErrorToast("Error loading inventory: " + e.getMessage());
+                    if (swipeRefreshLayout != null) {
+                        swipeRefreshLayout.setRefreshing(false);
+                    }
+                    isLoading = false;
+                });
+            }
+        }).start();
     }
 
     private void updateAdapter(List<InventoryItem> items) {
@@ -257,17 +290,12 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String selectedCategory = parent.getItemAtPosition(position).toString();
                 List<String> products = new ArrayList<>();
-                
                 if (selectedCategory.equals("All Categories")) {
-                    // If "All Categories" is selected, show all products
+                    products.clear();
                     products.add("All Products");
-                    for (List<String> categoryProducts : productCategories.values()) {
-                        products.addAll(categoryProducts);
-                    }
                 } else {
                     products = productCategories.get(selectedCategory);
                 }
-                
                 ArrayAdapter<String> productsAdapter = new ArrayAdapter<>(
                     requireContext(),
                     android.R.layout.simple_spinner_item,
@@ -277,7 +305,6 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
                 productsSpinner.setAdapter(productsAdapter);
                 loadInventoryData(); // Reload data when category changes
             }
-
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 // Do nothing
@@ -290,7 +317,6 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 loadInventoryData(); // Reload data when product changes
             }
-
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 // Do nothing
@@ -299,11 +325,51 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
     }
 
     private void filterInventoryItems(String searchQuery) {
-        if (searchQuery.isEmpty()) {
-            loadInventoryData();
-        } else {
-            List<InventoryItem> filteredItems = dbHelper.searchInventoryItems(searchQuery);
-            updateAdapter(filteredItems);
-        }
+        if (currentItems == null) return;
+
+        new Thread(() -> {
+            List<InventoryItem> filteredList = new ArrayList<>();
+            for (InventoryItem item : currentItems) {
+                if (item.getName().toLowerCase().contains(searchQuery) ||
+                    item.getCategory().toLowerCase().contains(searchQuery)) {
+                    filteredList.add(item);
+                }
+            }
+            requireActivity().runOnUiThread(() -> updateAdapter(filteredList));
+        }).start();
+    }
+
+    private void showSellDialog(InventoryItem item) {
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_sell_quantity, null);
+        EditText quantityInput = dialogView.findViewById(R.id.quantityInput);
+
+        new AlertDialog.Builder(requireContext())
+            .setTitle("Sell " + item.getName())
+            .setView(dialogView)
+            .setPositiveButton("Sell", (dialog, which) -> {
+                String quantityStr = quantityInput.getText().toString().trim();
+                if (!quantityStr.isEmpty()) {
+                    try {
+                        int quantity = Integer.parseInt(quantityStr);
+                        if (quantity > 0) {
+                            new Thread(() -> {
+                                String resultMessage = dbHelper.sellInventoryItem(item.getId(), quantity);
+                                requireActivity().runOnUiThread(() -> {
+                                    Toast.makeText(getContext(), resultMessage, Toast.LENGTH_SHORT).show();
+                                    loadInventoryData();
+                                });
+                            }).start();
+                        } else {
+                            Toast.makeText(getContext(), "Please enter a valid quantity", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (NumberFormatException e) {
+                        Toast.makeText(getContext(), "Please enter a valid number", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(getContext(), "Please enter quantity", Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 } 

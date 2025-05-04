@@ -14,13 +14,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 public class MyDataBaseHelper extends SQLiteOpenHelper {
 
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
     private static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 5;
+    private static final int DATABASE_VERSION = 6;
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
@@ -49,6 +52,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String COLUMN_DELETED_AT = "deleted_at";
     private static final String COLUMN_READ_AT = "read_at";
 
+    private static final String TABLE_SALES = "sales";
+    private static final String COLUMN_SALE_ID = "id";
+    private static final String COLUMN_PRODUCT_ID = "product_id";
+    private static final String COLUMN_QUANTITY = "quantity";
+    private static final String COLUMN_TOTAL_AMOUNT = "total_amount";
+    private static final String COLUMN_SALE_DATE = "sale_date";
+
     private static final Map<String, Float> PRODUCT_PRICES = new HashMap<>();
     private static final Map<String, Integer> PRODUCT_THRESHOLDS = new HashMap<>();
 
@@ -70,6 +80,16 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     COLUMN_PRICE + " FLOAT NOT NULL, " +
                     COLUMN_MIN_THRESHOLD + " INTEGER DEFAULT 10);";
             db.execSQL(inventoryQuery);
+            Log.d(TAG, "Inventory table created successfully");
+
+            String salesQuery = "CREATE TABLE " + TABLE_SALES + "(" +
+                    COLUMN_SALE_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_PRODUCT_ID + " TEXT NOT NULL, " +
+                    COLUMN_QUANTITY + " INTEGER NOT NULL, " +
+                    COLUMN_TOTAL_AMOUNT + " FLOAT NOT NULL, " +
+                    COLUMN_SALE_DATE + " TEXT NOT NULL);";
+            db.execSQL(salesQuery);
+            Log.d(TAG, "Sales table created successfully");
 
             String usersQuery = "CREATE TABLE " + TABLE_USERS + " (" +
                     COLUMN_USER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -77,6 +97,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     COLUMN_EMAIL + " TEXT UNIQUE NOT NULL, " +
                     COLUMN_PASSWORD + " TEXT NOT NULL)";
             db.execSQL(usersQuery);
+            Log.d(TAG, "Users table created successfully");
 
             String deliveryQuery = "CREATE TABLE " + TABLE_DELIVERY + "(" +
                     COLUMN_DELIVERY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -85,19 +106,22 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     COLUMN_TIME + " TEXT NOT NULL," +
                     COLUMN_STATUS + " TEXT DEFAULT 'Pending')";
             db.execSQL(deliveryQuery);
+            Log.d(TAG, "Delivery table created successfully");
 
             String createDeletedNotificationsTable = "CREATE TABLE " + TABLE_DELETED_NOTIFICATIONS + " (" +
                     COLUMN_NOTIFICATION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
                     COLUMN_DELIVERY_ID + " TEXT NOT NULL," +
                     COLUMN_DELETED_AT + " INTEGER NOT NULL)";
             db.execSQL(createDeletedNotificationsTable);
+            Log.d(TAG, "Deleted notifications table created successfully");
 
             String createReadNotificationsTable = "CREATE TABLE " + TABLE_READ_NOTIFICATIONS + " (" +
                     COLUMN_NOTIFICATION_ID + " TEXT PRIMARY KEY," +
                     COLUMN_READ_AT + " INTEGER NOT NULL)";
             db.execSQL(createReadNotificationsTable);
+            Log.d(TAG, "Read notifications table created successfully");
 
-            Log.d(TAG, "Database tables created successfully");
+            Log.d(TAG, "All database tables created successfully");
         } catch (Exception e) {
             Log.e(TAG, "Error creating database tables: " + e.getMessage());
             throw new RuntimeException("Failed to create database tables", e);
@@ -641,6 +665,167 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             if (cursor != null) {
                 cursor.close();
             }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+    }
+
+    public String sellInventoryItem(String itemId, int quantity) {
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        try {
+            db = this.getWritableDatabase();
+            cursor = db.query(TABLE_INVENTORY,
+                    new String[]{COLUMN_QTY, COLUMN_PRICE, COLUMN_NAME},
+                    COLUMN_ID + " = ?",
+                    new String[]{itemId},
+                    null, null, null);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                int currentQty = cursor.getInt(0);
+                float price = cursor.getFloat(1);
+                String productName = cursor.getString(2);
+
+                if (currentQty >= quantity) {
+                    int newQty = currentQty - quantity;
+                    float totalAmount = price * quantity;
+
+                    db.beginTransaction();
+                    try {
+                        ContentValues updateValues = new ContentValues();
+                        updateValues.put(COLUMN_QTY, newQty);
+                        db.update(TABLE_INVENTORY, updateValues, COLUMN_ID + " = ?", new String[]{itemId});
+
+                        ContentValues saleValues = new ContentValues();
+                        saleValues.put(COLUMN_PRODUCT_ID, itemId);
+                        saleValues.put(COLUMN_QUANTITY, quantity);
+                        saleValues.put(COLUMN_TOTAL_AMOUNT, totalAmount);
+                        saleValues.put(COLUMN_SALE_DATE, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+
+                        long saleId = db.insert(TABLE_SALES, null, saleValues);
+
+                        if (saleId != -1) {
+                            db.setTransactionSuccessful();
+                            return String.format("Sold %d %s for ₱%.2f", quantity, productName, totalAmount);
+                        } else {
+                            return "Failed to record sale";
+                        }
+                    } catch (Exception e) {
+                        return "Error recording sale: " + e.getMessage();
+                    } finally {
+                        db.endTransaction();
+                    }
+                } else {
+                    return "Not enough stock available!";
+                }
+            } else {
+                return "Product not found!";
+            }
+        } catch (Exception e) {
+            return "Error recording sale: " + e.getMessage();
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+    }
+
+    public SalesSummary getSalesSummary() {
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        SalesSummary summary = new SalesSummary();
+        
+        try {
+            db = this.getReadableDatabase();
+            
+            // Get total revenue and total orders in a single query
+            String query = "SELECT COUNT(*) as total_orders, " +
+                         "COALESCE(SUM(" + COLUMN_TOTAL_AMOUNT + "), 0) as total_revenue " +
+                         "FROM " + TABLE_SALES;
+            
+            cursor = db.rawQuery(query, null);
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                int totalOrders = cursor.getInt(0);
+                double totalRevenue = cursor.getDouble(1);
+                
+                summary.setTotalOrders(totalOrders);
+                summary.setTotalRevenue(totalRevenue);
+                
+                // Average order value will be calculated automatically in SalesSummary
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting sales summary: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        
+        return summary;
+    }
+
+    public List<SalesRecord> getRecentSales() {
+        List<SalesRecord> salesRecords = new ArrayList<>();
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        
+        try {
+            db = this.getReadableDatabase();
+            
+            // Join sales table with inventory table to get product names
+            String query = "SELECT s." + COLUMN_SALE_ID + ", s." + COLUMN_PRODUCT_ID + 
+                    ", i." + COLUMN_NAME + ", s." + COLUMN_QUANTITY + 
+                    ", s." + COLUMN_TOTAL_AMOUNT + ", s." + COLUMN_SALE_DATE +
+                    " FROM " + TABLE_SALES + " s" +
+                    " LEFT JOIN " + TABLE_INVENTORY + " i ON s." + COLUMN_PRODUCT_ID + 
+                    " = i." + COLUMN_ID +
+                    " ORDER BY s." + COLUMN_SALE_DATE + " DESC";
+            
+            cursor = db.rawQuery(query, null);
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String id = cursor.getString(0);
+                    String productId = cursor.getString(1);
+                    String productName = cursor.getString(2);
+                    int quantity = cursor.getInt(3);
+                    double totalAmount = cursor.getDouble(4);
+                    String saleDate = cursor.getString(5);
+                    
+                    salesRecords.add(new SalesRecord(id, productId, productName, quantity, totalAmount, saleDate));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting recent sales: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        
+        return salesRecords;
+    }
+
+    public void deleteAllSales() {
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            db.delete(TABLE_SALES, null, null);
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting all sales: " + e.getMessage());
+        } finally {
             if (db != null && db.isOpen()) {
                 db.close();
             }

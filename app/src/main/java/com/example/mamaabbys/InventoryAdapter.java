@@ -7,21 +7,26 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.button.MaterialButton;
 import java.util.List;
 
 public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.InventoryViewHolder> {
     private List<InventoryItem> items;
     private OnItemClickListener listener;
+    private OnSellClickListener sellListener;
 
     public interface OnItemClickListener {
         void onItemClick(InventoryItem item);
-
-
     }
 
-    public InventoryAdapter(List<InventoryItem> items, OnItemClickListener listener) {
+    public interface OnSellClickListener {
+        void onSellClick(InventoryItem item);
+    }
+
+    public InventoryAdapter(List<InventoryItem> items, OnItemClickListener listener, OnSellClickListener sellListener) {
         this.items = items;
         this.listener = listener;
+        this.sellListener = sellListener;
     }
 
     @NonNull
@@ -44,6 +49,12 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.Inve
                 listener.onItemClick(item);
             }
         });
+
+        holder.sellButton.setOnClickListener(v -> {
+            if (sellListener != null) {
+                sellListener.onSellClick(item);
+            }
+        });
     }
 
     @Override
@@ -60,12 +71,14 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.Inve
         TextView itemName;
         TextView stockInfo;
         ImageView itemIcon;
+        MaterialButton sellButton;
 
         InventoryViewHolder(@NonNull View itemView) {
             super(itemView);
             itemName = itemView.findViewById(R.id.itemName);
             stockInfo = itemView.findViewById(R.id.stockInfo);
             itemIcon = itemView.findViewById(R.id.itemIcon);
+            sellButton = itemView.findViewById(R.id.sellButton);
         }
     }
 } 
