@@ -5,6 +5,7 @@ import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import android.widget.ImageButton;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -28,6 +29,10 @@ public class NotificationActivity extends AppCompatActivity implements
 
         myDB = new MyDataBaseHelper(this);
         notificationItems = new ArrayList<>();
+
+        // Setup back button
+        ImageButton backButton = findViewById(R.id.backButton);
+        backButton.setOnClickListener(v -> finish());
 
         // Setup RecyclerView
         recyclerView = findViewById(R.id.notificationsRecyclerView);
