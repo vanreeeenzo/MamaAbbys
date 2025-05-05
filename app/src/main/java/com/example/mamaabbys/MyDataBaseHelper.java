@@ -23,7 +23,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
     private static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 6;
+    private static final int DATABASE_VERSION = 7;
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
@@ -45,6 +45,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String COLUMN_DATE = "delivery_date";
     private static final String COLUMN_TIME = "delivery_time";
     private static final String COLUMN_STATUS = "status";
+    private static final String COLUMN_LOCATION = "location";
 
     private static final String TABLE_DELETED_NOTIFICATIONS = "deleted_notifications";
     private static final String TABLE_READ_NOTIFICATIONS = "read_notifications";
@@ -126,13 +127,15 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             db.execSQL(usersQuery);
             Log.d(TAG, "Users table created successfully");
 
-            String deliveryQuery = "CREATE TABLE " + TABLE_DELIVERY + "(" +
-                    COLUMN_DELIVERY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    COLUMN_ORDER + " TEXT NOT NULL," +
-                    COLUMN_DATE + " TEXT NOT NULL," +
-                    COLUMN_TIME + " TEXT NOT NULL," +
-                    COLUMN_STATUS + " TEXT DEFAULT 'Pending')";
-            db.execSQL(deliveryQuery);
+            String createDeliveryTable = "CREATE TABLE " + TABLE_DELIVERY + " (" +
+                    COLUMN_DELIVERY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_ORDER + " TEXT, " +
+                    COLUMN_DATE + " TEXT, " +
+                    COLUMN_TIME + " TEXT, " +
+                    COLUMN_STATUS + " TEXT, " +
+                    COLUMN_LOCATION + " TEXT" +
+                    ")";
+            db.execSQL(createDeliveryTable);
             Log.d(TAG, "Delivery table created successfully");
 
             String createDeletedNotificationsTable = "CREATE TABLE " + TABLE_DELETED_NOTIFICATIONS + " (" +
@@ -186,12 +189,9 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 Log.d(TAG, "Created deleted notifications table");
             }
 
-            if (oldVersion < 5) {
-                String createReadNotificationsTable = "CREATE TABLE " + TABLE_READ_NOTIFICATIONS + " (" +
-                        COLUMN_NOTIFICATION_ID + " TEXT PRIMARY KEY," +
-                        COLUMN_READ_AT + " INTEGER NOT NULL)";
-                db.execSQL(createReadNotificationsTable);
-                Log.d(TAG, "Created read notifications table");
+            if (oldVersion < 7) {
+                db.execSQL("ALTER TABLE " + TABLE_DELIVERY + " ADD COLUMN " + COLUMN_LOCATION + " TEXT");
+                Log.d(TAG, "Added location column to delivery table");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error upgrading database: " + e.getMessage());
@@ -518,11 +518,18 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             values.put(COLUMN_DATE, delivery.getDeliveryDate());
             values.put(COLUMN_TIME, delivery.getDeliveryTime());
             values.put(COLUMN_STATUS, "Pending");
+            values.put(COLUMN_LOCATION, delivery.getLocation());
 
             long result = db.insert(TABLE_DELIVERY, null, values);
-            return result != -1;
+            if (result == -1) {
+                Log.e(TAG, "Failed to insert delivery into database");
+                return false;
+            }
+            Log.d(TAG, "Successfully added delivery with ID: " + result);
+            return true;
         } catch (Exception e) {
             Log.e(TAG, "Error adding delivery: " + e.getMessage());
+            e.printStackTrace();
             return false;
         } finally {
             if (db != null && db.isOpen()) {
@@ -549,8 +556,9 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     String date = cursor.getString(cursor.getColumnIndex(COLUMN_DATE));
                     String time = cursor.getString(cursor.getColumnIndex(COLUMN_TIME));
                     String status = cursor.getString(cursor.getColumnIndex(COLUMN_STATUS));
+                    String location = cursor.getString(cursor.getColumnIndex(COLUMN_LOCATION));
 
-                    Delivery delivery = new Delivery(order, date, time);
+                    Delivery delivery = new Delivery(order, date, time, location);
                     delivery.setId(id);
                     delivery.setStatus(status);
                     deliveries.add(delivery);
@@ -650,8 +658,9 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 String orderDescription = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER));
                 String deliveryDate = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DATE));
                 String deliveryTime = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TIME));
+                String location = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_LOCATION));
                 
-                Delivery delivery = new Delivery(orderDescription, deliveryDate, deliveryTime);
+                Delivery delivery = new Delivery(orderDescription, deliveryDate, deliveryTime, location);
                 delivery.setId(id);
                 return delivery;
             }

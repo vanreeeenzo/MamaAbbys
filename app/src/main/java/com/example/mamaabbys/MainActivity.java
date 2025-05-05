@@ -2,7 +2,10 @@ package com.example.mamaabbys;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -19,6 +22,8 @@ import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.firebase.database.FirebaseDatabase;
 
+import java.util.List;
+
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final String KEY_CURRENT_POSITION = "current_position";
@@ -31,20 +36,30 @@ public class MainActivity extends AppCompatActivity {
     private MyDataBaseHelper dbHelper;
     private ImageButton notificationButton;
     private TextView notificationBadge;
-
+    private BroadcastReceiver notificationReadReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        initializeViews();
-        setupViewPager();
-        setupClickListeners();
-        setupPageChangeListener();
-        setupNotificationButton();
-        
-        // Initialize Firebase in background
+        try {
+            initializeViews();
+            setupViewPager();
+            setupClickListeners();
+            setupPageChangeListener();
+            setupNotificationButton();
+            setupNotificationReceiver();
+            
+            // Initialize Firebase in background with proper error handling
+            initializeFirebase();
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onCreate: " + e.getMessage());
+            Toast.makeText(this, "Error initializing app", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void initializeFirebase() {
         new Thread(() -> {
             try {
                 FirebaseDatabase.getInstance().getReference()
@@ -62,15 +77,19 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-
     private void initializeViews() {
-        notificationButton = findViewById(R.id.notificationButton);
-        notificationBadge = findViewById(R.id.notificationBadge);
-        viewPager = findViewById(R.id.viewPager);
-        tabLayout = findViewById(R.id.tabLayout);
-        fab = findViewById(R.id.quickActionsBar);
-        deleteAllButton = findViewById(R.id.deleteAllButton);
-        dbHelper = new MyDataBaseHelper(this);
+        try {
+            notificationButton = findViewById(R.id.notificationButton);
+            notificationBadge = findViewById(R.id.notificationBadge);
+            viewPager = findViewById(R.id.viewPager);
+            tabLayout = findViewById(R.id.tabLayout);
+            fab = findViewById(R.id.quickActionsBar);
+            deleteAllButton = findViewById(R.id.deleteAllButton);
+            dbHelper = new MyDataBaseHelper(this);
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing views: " + e.getMessage());
+            throw e;
+        }
     }
 
     private void setupViewPager() {
@@ -174,12 +193,98 @@ public class MainActivity extends AppCompatActivity {
         viewPager.setCurrentItem(position, false);
         updateUIForPosition(position);
     }
+
     private void setupNotificationButton() {
-        notificationButton.setOnClickListener(v -> {
-            Intent intent = new Intent(MainActivity.this, NotificationActivity.class);
-            startActivity(intent);
-        });
+        if (notificationButton != null) {
+            notificationButton.setOnClickListener(v -> {
+                try {
+                    Intent intent = new Intent(MainActivity.this, NotificationActivity.class);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error starting NotificationActivity: " + e.getMessage());
+                    Toast.makeText(this, "Error opening notifications", Toast.LENGTH_SHORT).show();
+                }
+            });
+            
+            // Check for unread notifications initially
+            updateNotificationBadge();
+        }
     }
 
+    private void updateNotificationBadge() {
+        try {
+            if (notificationBadge == null || dbHelper == null) {
+                return;
+            }
+
+            // Get all notifications from database
+            List<Delivery> deliveries = dbHelper.getAllDeliveries();
+            boolean hasUnreadNotifications = false;
+
+            for (Delivery delivery : deliveries) {
+                // Skip if notification was previously deleted
+                if (dbHelper.isNotificationDeleted(delivery.getId())) {
+                    continue;
+                }
+
+                // Check if notification is unread
+                if (!dbHelper.isNotificationRead(delivery.getId())) {
+                    hasUnreadNotifications = true;
+                    break;
+                }
+            }
+
+            // Update badge visibility
+            if (notificationBadge != null) {
+                notificationBadge.setVisibility(hasUnreadNotifications ? View.VISIBLE : View.GONE);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating notification badge: " + e.getMessage());
+        }
+    }
+
+    private void setupNotificationReceiver() {
+        try {
+            notificationReadReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if ("com.example.mamaabbys.NOTIFICATION_READ".equals(intent.getAction())) {
+                        updateNotificationBadge();
+                    }
+                }
+            };
+            
+            IntentFilter filter = new IntentFilter("com.example.mamaabbys.NOTIFICATION_READ");
+            registerReceiver(notificationReadReceiver, filter);
+        } catch (Exception e) {
+            Log.e(TAG, "Error setting up notification receiver: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        try {
+            // Update badge when returning to MainActivity
+            updateNotificationBadge();
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onResume: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try {
+            if (notificationReadReceiver != null) {
+                unregisterReceiver(notificationReadReceiver);
+            }
+            if (dbHelper != null) {
+                dbHelper.close();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onDestroy: " + e.getMessage());
+        }
+    }
 }
 

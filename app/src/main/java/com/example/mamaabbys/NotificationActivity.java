@@ -1,6 +1,7 @@
 package com.example.mamaabbys;
 
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -56,17 +57,17 @@ public class NotificationActivity extends AppCompatActivity implements
                 long daysLeft = calculateDaysLeft(delivery);
                 String notificationTitle = "";
                 String notificationMessage = "";
-                String orderDetails = "Order: " + delivery.getOrderDescription();
+                String orderDetails = "Order: " + delivery.getOrderDescription() + "\nLocation: " + delivery.getLocation();
 
                 if (daysLeft == 7) {
                     notificationTitle = "Delivery in 7 days";
-                    notificationMessage = "Your order is scheduled for delivery in 7 days on " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime();
+                    notificationMessage = "Your order is scheduled for delivery in 7 days on " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
                 } else if (daysLeft == 3) {
                     notificationTitle = "Delivery in 3 days";
-                    notificationMessage = "Your order is scheduled for delivery in 3 days on " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime();
+                    notificationMessage = "Your order is scheduled for delivery in 3 days on " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
                 } else if (daysLeft == 0) {
                     notificationTitle = "Delivery today!";
-                    notificationMessage = "Your order is scheduled for delivery today at " + delivery.getDeliveryTime();
+                    notificationMessage = "Your order is scheduled for delivery today at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
                 }
 
                 if (!notificationTitle.isEmpty() && !notificationMessage.isEmpty()) {
@@ -160,6 +161,10 @@ public class NotificationActivity extends AppCompatActivity implements
                 return Boolean.compare(a.isRead(), b.isRead());
             });
             adapter.updateNotifications(notificationItems);
+            
+            // Broadcast that a notification was marked as read
+            Intent intent = new Intent("com.example.mamaabbys.NOTIFICATION_READ");
+            sendBroadcast(intent);
         }
     }
 }

@@ -7,13 +7,14 @@ public class Delivery {
     private String deliveryTime;
     private String status;
     private boolean isDone;
+    private String location;
 
-    public Delivery(String orderDescription, String deliveryDate, String deliveryTime) {
+    public Delivery(String orderDescription, String deliveryDate, String deliveryTime, String location) {
         this.orderDescription = orderDescription;
         this.deliveryDate = deliveryDate;
         this.deliveryTime = deliveryTime;
+        this.location = location;
         this.status = "Pending"; // Default status
-
     }
 
     public String getId() {
@@ -60,8 +61,15 @@ public class Delivery {
         return "Done".equalsIgnoreCase(status);
     }
 
-
     public void setDone(boolean done) {
         isDone = done;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
     }
 }

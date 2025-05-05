@@ -65,9 +65,9 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
                     delivery.getId(),
                     delivery.getOrderDescription(),
                     schedule,
+                    delivery.getLocation(),
                     R.drawable.ic_truck
             );
-
 
             item.setDone(delivery.isDone());
             items.add(item);

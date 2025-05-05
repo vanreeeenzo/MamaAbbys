@@ -56,6 +56,7 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
         DeliveryItem item = items.get(position);
         holder.orderNumber.setText(item.getOrderNumber());
         holder.schedule.setText(item.getSchedule());
+        holder.location.setText("Location: " + item.getLocation());
         holder.deliveryIcon.setImageResource(item.getIconResId());
 
         if (item.isDone()) {
@@ -85,7 +86,7 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
     }
 
     static class DeliveryViewHolder extends RecyclerView.ViewHolder {
-        TextView orderNumber, schedule;
+        TextView orderNumber, schedule, location;
         ImageView deliveryIcon;
         Button btnMarkAsDone, btnCancelDelivery;
 
@@ -93,6 +94,7 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
             super(itemView);
             orderNumber = itemView.findViewById(R.id.orderNumber);
             schedule = itemView.findViewById(R.id.schedule);
+            location = itemView.findViewById(R.id.location);
             deliveryIcon = itemView.findViewById(R.id.deliveryIcon);
             btnMarkAsDone = itemView.findViewById(R.id.btnMarkAsDone);
             btnCancelDelivery = itemView.findViewById(R.id.btnCancelDelivery);

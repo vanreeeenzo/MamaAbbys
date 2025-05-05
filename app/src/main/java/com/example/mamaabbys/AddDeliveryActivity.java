@@ -5,6 +5,7 @@ import android.app.TimePickerDialog;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import java.text.SimpleDateFormat;
@@ -14,8 +15,9 @@ import java.util.Locale;
 
 public class AddDeliveryActivity extends AppCompatActivity {
 
-    EditText editTextOrder, editTextDate, editTextTime;
+    EditText editTextOrder, editTextDate, editTextTime, editTextLocation;
     Button btnSaveDelivery;
+    ImageButton btnClose;
     MyDataBaseHelper myDB;
     private Calendar selectedDate;
     private Calendar currentDate;
@@ -25,24 +27,29 @@ public class AddDeliveryActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.add_delivery);
 
+        myDB = new MyDataBaseHelper(this);
         editTextOrder = findViewById(R.id.editTextOrder);
         editTextDate = findViewById(R.id.editTextDate);
         editTextTime = findViewById(R.id.editTextTime);
+        editTextLocation = findViewById(R.id.editTextLocation);
         btnSaveDelivery = findViewById(R.id.btnSaveDelivery);
+        btnClose = findViewById(R.id.btnClose);
 
-        myDB = new MyDataBaseHelper(this);
         currentDate = Calendar.getInstance();
         selectedDate = Calendar.getInstance();
 
         editTextDate.setOnClickListener(v -> showDatePicker());
         editTextTime.setOnClickListener(v -> showTimePicker());
 
+        btnClose.setOnClickListener(v -> finish());
+
         btnSaveDelivery.setOnClickListener(v -> {
             String order = editTextOrder.getText().toString().trim();
             String date = editTextDate.getText().toString().trim();
             String time = editTextTime.getText().toString().trim();
+            String location = editTextLocation.getText().toString().trim();
 
-            if (order.isEmpty() || date.isEmpty() || time.isEmpty()) {
+            if (order.isEmpty() || date.isEmpty() || time.isEmpty() || location.isEmpty()) {
                 Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -53,7 +60,7 @@ public class AddDeliveryActivity extends AppCompatActivity {
                 return;
             }
 
-            Delivery delivery = new Delivery(order, date, time);
+            Delivery delivery = new Delivery(order, date, time, location);
             boolean success = myDB.addDelivery(delivery);
             if (success) {
                 Toast.makeText(this, "Delivery saved successfully", Toast.LENGTH_SHORT).show();
@@ -110,5 +117,6 @@ public class AddDeliveryActivity extends AppCompatActivity {
         editTextOrder.setText("");
         editTextDate.setText("");
         editTextTime.setText("");
+        editTextLocation.setText("");
     }
 }
