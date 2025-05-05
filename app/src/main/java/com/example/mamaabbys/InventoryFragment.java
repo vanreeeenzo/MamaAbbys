@@ -149,6 +149,16 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
                             swipeRefreshLayout.setRefreshing(false);
                         }
                         isLoading = false;
+                        
+                        // Check for out-of-stock items
+                        List<InventoryItem> outOfStockItems = dbHelper.getOutOfStockItems();
+                        if (!outOfStockItems.isEmpty()) {
+                            StringBuilder message = new StringBuilder("Out of Stock Items:\n");
+                            for (InventoryItem item : outOfStockItems) {
+                                message.append("- ").append(item.getName()).append("\n");
+                            }
+                            showErrorToast(message.toString());
+                        }
                     });
                     return;
                 }

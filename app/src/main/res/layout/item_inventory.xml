@@ -31,7 +31,7 @@
             android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="?android:attr/textColorPrimary"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/sellButton"
             app:layout_constraintStart_toEndOf="@id/itemIcon"
             app:layout_constraintTop_toTopOf="@id/itemIcon" />
 
@@ -50,17 +50,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Sell"
-            android:textSize="12sp"
-            android:padding="8dp"
-            app:icon="@drawable/ic_chart"
-            app:iconSize="16dp"
-            app:iconGravity="textStart"
-            app:iconTint="@color/white"
+            android:textColor="@android:color/white"
             app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="8dp"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
+            app:layout_constraintTop_toTopOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.cardview.widget.CardView> 

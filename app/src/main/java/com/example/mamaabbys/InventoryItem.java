@@ -118,9 +118,19 @@ public class InventoryItem implements Parcelable {
 
     private void updateStockInfo() {
         this.stockInfo = String.format("In Stock: %d | Price: ₱%.2f", quantity, price);
-        if (quantity <= minThreshold) {
+        if (isOutOfStock()) {
+            this.stockInfo += " (Out of Stock!)";
+        } else if (isLowStock()) {
             this.stockInfo += " (Low Stock!)";
         }
+    }
+
+    public boolean isLowStock() {
+        return quantity <= minThreshold && quantity > 0;
+    }
+
+    public boolean isOutOfStock() {
+        return quantity <= 0;
     }
 
     @Override

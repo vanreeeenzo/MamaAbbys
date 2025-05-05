@@ -1,5 +1,6 @@
 package com.example.mamaabbys;
 
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -8,6 +9,9 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.button.MaterialButton;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.InventoryViewHolder> {
@@ -24,9 +28,29 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.Inve
     }
 
     public InventoryAdapter(List<InventoryItem> items, OnItemClickListener listener, OnSellClickListener sellListener) {
-        this.items = items;
+        this.items = new ArrayList<>(items);
         this.listener = listener;
         this.sellListener = sellListener;
+        sortItems();
+    }
+
+    private void sortItems() {
+        Collections.sort(items, (item1, item2) -> {
+            // First sort by out of stock status
+            boolean isOutOfStock1 = item1.isOutOfStock();
+            boolean isOutOfStock2 = item2.isOutOfStock();
+            if (isOutOfStock1 != isOutOfStock2) {
+                return isOutOfStock1 ? -1 : 1;
+            }
+            // Then sort by low stock status
+            boolean isLowStock1 = item1.isLowStock();
+            boolean isLowStock2 = item2.isLowStock();
+            if (isLowStock1 != isLowStock2) {
+                return isLowStock1 ? -1 : 1;
+            }
+            // Finally sort by name
+            return item1.getName().compareTo(item2.getName());
+        });
     }
 
     @NonNull
@@ -43,6 +67,21 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.Inve
         holder.itemName.setText(item.getName());
         holder.stockInfo.setText(item.getStockInfo());
         holder.itemIcon.setImageResource(item.getIconResId());
+        
+        // Set text color based on stock status
+        if (item.isOutOfStock()) {
+            holder.itemName.setTextColor(Color.RED);
+            holder.stockInfo.setTextColor(Color.RED);
+            holder.sellButton.setEnabled(false);
+        } else if (item.isLowStock()) {
+            holder.itemName.setTextColor(Color.parseColor("#FFA500")); // Orange color for low stock
+            holder.stockInfo.setTextColor(Color.parseColor("#FFA500"));
+            holder.sellButton.setEnabled(true);
+        } else {
+            holder.itemName.setTextColor(Color.BLACK);
+            holder.stockInfo.setTextColor(Color.GRAY);
+            holder.sellButton.setEnabled(true);
+        }
         
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
@@ -63,7 +102,8 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.Inve
     }
 
     public void updateItems(List<InventoryItem> newItems) {
-        this.items = newItems;
+        this.items = new ArrayList<>(newItems);
+        sortItems();
         notifyDataSetChanged();
     }
 

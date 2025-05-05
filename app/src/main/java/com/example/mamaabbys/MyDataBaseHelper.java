@@ -382,11 +382,17 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     int minThreshold = cursor.getInt(5);
                     String stockInfo = "In Stock: " + quantity + " | Price: ₱" + String.format("%.2f", price);
 
-                    if (quantity <= minThreshold) {
+                    if (quantity <= 0) {
+                        stockInfo += " (Out of Stock!)";
+                    } else if (quantity <= minThreshold) {
                         stockInfo += " (Low Stock!)";
                     }
 
-                    inventoryItems.add(new InventoryItem(id, name, stockInfo, R.drawable.ic_package, category));
+                    InventoryItem item = new InventoryItem(id, name, stockInfo, R.drawable.ic_package, category);
+                    item.setQuantity(quantity);
+                    item.setPrice(price);
+                    item.setMinThreshold(minThreshold);
+                    inventoryItems.add(item);
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
@@ -453,11 +459,17 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     int minThreshold = cursor.getInt(5);
                     String stockInfo = "In Stock: " + quantity + " | Price: ₱" + String.format("%.2f", price);
 
-                    if (quantity <= minThreshold) {
+                    if (quantity <= 0) {
+                        stockInfo += " (Out of Stock!)";
+                    } else if (quantity <= minThreshold) {
                         stockInfo += " (Low Stock!)";
                     }
 
-                    inventoryItems.add(new InventoryItem(id, name, stockInfo, R.drawable.ic_package, category));
+                    InventoryItem item = new InventoryItem(id, name, stockInfo, R.drawable.ic_package, category);
+                    item.setQuantity(quantity);
+                    item.setPrice(price);
+                    item.setMinThreshold(minThreshold);
+                    inventoryItems.add(item);
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
@@ -830,6 +842,37 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 db.close();
             }
         }
+    }
+
+    public List<InventoryItem> getOutOfStockItems() {
+        List<InventoryItem> outOfStockItems = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        
+        String query = "SELECT * FROM " + TABLE_INVENTORY + " WHERE " + COLUMN_QTY + " = 0";
+        Cursor cursor = db.rawQuery(query, null);
+        
+        if (cursor.moveToFirst()) {
+            do {
+                String id = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ID));
+                String name = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_NAME));
+                String category = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_CATEGORY));
+                int quantity = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_QTY));
+                float price = cursor.getFloat(cursor.getColumnIndexOrThrow(COLUMN_PRICE));
+                int minThreshold = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_MIN_THRESHOLD));
+                
+                String stockInfo = String.format("In Stock: %d | Price: ₱%.2f (Out of Stock!)", quantity, price);
+                
+                InventoryItem item = new InventoryItem(id, name, stockInfo, R.drawable.ic_package, category);
+                item.setQuantity(quantity);
+                item.setPrice(price);
+                item.setMinThreshold(minThreshold);
+                
+                outOfStockItems.add(item);
+            } while (cursor.moveToNext());
+        }
+        
+        cursor.close();
+        return outOfStockItems;
     }
 }
 

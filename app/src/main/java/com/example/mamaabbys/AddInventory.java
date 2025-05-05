@@ -96,6 +96,10 @@ public class AddInventory extends AppCompatActivity {
 
         try {
             int quantity = Integer.parseInt(quantityStr);
+            if (quantity <= 0) {
+                Toast.makeText(this, "Quantity must be greater than 0", Toast.LENGTH_SHORT).show();
+                return;
+            }
             myDB.addInventory(selectedProduct, selectedCategory, quantity);
             
             // Clear inputs
