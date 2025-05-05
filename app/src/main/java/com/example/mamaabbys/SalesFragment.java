@@ -4,124 +4,91 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
+import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import java.util.ArrayList;
 import java.util.List;
 import java.text.NumberFormat;
 import java.util.Locale;
 
-public class SalesFragment extends Fragment implements SalesAdapter.OnItemClickListener, SalesEventBus.OnSaleListener {
+public class SalesFragment extends Fragment implements OrderAdapter.OnOrderClickListener {
     private RecyclerView recyclerView;
-    private SalesAdapter adapter;
+    private OrderAdapter adapter;
+    private SwipeRefreshLayout swipeRefreshLayout;
     private MyDataBaseHelper dbHelper;
-    private NumberFormat currencyFormat;
-    private MaterialButton deleteAllButton;
+    private List<Order> currentOrders;
+    private TextView todayRevenueText;
+    private TextView weeklyRevenueText;
+    private TextView monthlyRevenueText;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        dbHelper = new MyDataBaseHelper(requireContext());
+    }
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_sales, container, false);
+        View view = inflater.inflate(R.layout.fragment_sales, container, false);
+        
+        // Initialize views
+        recyclerView = view.findViewById(R.id.ordersRecyclerView);
+        swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
+        todayRevenueText = view.findViewById(R.id.todayRevenueText);
+        weeklyRevenueText = view.findViewById(R.id.weeklyRevenueText);
+        monthlyRevenueText = view.findViewById(R.id.monthlyRevenueText);
+        
+        // Setup RecyclerView
+        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        adapter = new OrderAdapter(new ArrayList<>(), this);
+        recyclerView.setAdapter(adapter);
+        
+        // Setup SwipeRefreshLayout
+        swipeRefreshLayout.setOnRefreshListener(this::loadData);
+        
+        return view;
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        
-        dbHelper = new MyDataBaseHelper(requireContext());
-        recyclerView = view.findViewById(R.id.salesRecyclerView);
-        deleteAllButton = view.findViewById(R.id.deleteAllButton);
-        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        
-        // Initialize currency formatter
-        currencyFormat = NumberFormat.getCurrencyInstance(new Locale("en", "PH"));
-        currencyFormat.setMaximumFractionDigits(2);
-        currencyFormat.setMinimumFractionDigits(2);
-        
-        // Register for sales events
-        SalesEventBus.getInstance().registerListener(this);
-        
-        // Set up delete all button click listener
-        deleteAllButton.setOnClickListener(v -> showDeleteConfirmationDialog());
-        
-        loadSalesData();
+        loadData();
     }
 
-    private void showDeleteConfirmationDialog() {
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Delete All Sales")
-            .setMessage("Are you sure you want to delete all sales records? This action cannot be undone.")
-            .setPositiveButton("Delete", (dialog, which) -> {
-                deleteAllSales();
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
-    }
-
-    private void deleteAllSales() {
-        dbHelper.deleteAllSales();
-        Toast.makeText(getContext(), "All sales records have been deleted", Toast.LENGTH_SHORT).show();
-        loadSalesData(); // Refresh the view
-    }
-
-    private void loadSalesData() {
-        SalesSummary summary = dbHelper.getSalesSummary();
-        List<SalesItem> items = new ArrayList<>();
-        
-        // Add summary items with formatted values
-        double totalRevenue = summary.getTotalRevenue();
-        int totalOrders = summary.getTotalOrders();
-        double averageOrderValue = summary.getAverageOrderValue();
-        
-        items.add(new SalesItem("1", "Total Revenue", currencyFormat.format(totalRevenue), R.drawable.ic_chart));
-        items.add(new SalesItem("2", "Total Orders", String.valueOf(totalOrders), R.drawable.ic_chart));
-        items.add(new SalesItem("3", "Average Order Value", currencyFormat.format(averageOrderValue), R.drawable.ic_chart));
-        
-        // Add individual sales records
-        List<SalesRecord> salesRecords = dbHelper.getRecentSales();
-        for (SalesRecord record : salesRecords) {
-            String title = record.getProductName() + " x" + record.getQuantity();
-            String amount = currencyFormat.format(record.getTotalAmount());
-            items.add(new SalesItem(record.getId(), title, amount, R.drawable.ic_chart));
-        }
-        
-        if (adapter == null) {
-            adapter = new SalesAdapter(items, this);
-            recyclerView.setAdapter(adapter);
-        } else {
-            adapter.updateItems(items);
-        }
+    private void loadData() {
+        new Thread(() -> {
+            List<Order> orders = dbHelper.getAllOrders();
+            double todayRevenue = dbHelper.getTodayRevenue();
+            double weeklyRevenue = dbHelper.getWeeklyRevenue();
+            double monthlyRevenue = dbHelper.getMonthlyRevenue();
+            
+            requireActivity().runOnUiThread(() -> {
+                currentOrders = orders;
+                adapter.updateOrders(orders);
+                
+                // Format and display revenue information
+                NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("en", "PH"));
+                todayRevenueText.setText("Today's Revenue: " + currencyFormat.format(todayRevenue));
+                weeklyRevenueText.setText("Weekly Revenue: " + currencyFormat.format(weeklyRevenue));
+                monthlyRevenueText.setText("Monthly Revenue: " + currencyFormat.format(monthlyRevenue));
+                
+                if (swipeRefreshLayout != null) {
+                    swipeRefreshLayout.setRefreshing(false);
+                }
+            });
+        }).start();
     }
 
     @Override
-    public void onItemClick(SalesItem item) {
-        Toast.makeText(getContext(), "Clicked: " + item.getTitle(), Toast.LENGTH_SHORT).show();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        loadSalesData(); // Refresh data when returning to the fragment
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        // Unregister from sales events
-        SalesEventBus.getInstance().unregisterListener(this);
-    }
-
-    @Override
-    public void onSaleMade() {
-        // Refresh sales data when a new sale is made
-        if (isAdded()) { // Check if fragment is still attached to activity
-            loadSalesData();
-        }
+    public void onOrderClick(Order order) {
+        // Show order details dialog
+        OrderDetailsDialog dialog = OrderDetailsDialog.newInstance(order);
+        dialog.show(getChildFragmentManager(), "OrderDetails");
     }
 } 

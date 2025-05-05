@@ -59,6 +59,21 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String COLUMN_TOTAL_AMOUNT = "total_amount";
     private static final String COLUMN_SALE_DATE = "sale_date";
 
+    private static final String TABLE_ORDERS = "orders";
+    private static final String COLUMN_ORDER_ID = "id";
+    private static final String COLUMN_ORDER_DATE = "order_date";
+    private static final String COLUMN_ORDER_TIME = "order_time";
+    private static final String COLUMN_ORDER_TOTAL = "order_total";
+    private static final String COLUMN_ORDER_STATUS = "order_status";
+
+    private static final String TABLE_ORDER_ITEMS = "order_items";
+    private static final String COLUMN_ORDER_ITEM_ID = "id";
+    private static final String COLUMN_ORDER_ID_FK = "order_id";
+    private static final String COLUMN_ORDER_PRODUCT_ID = "product_id";
+    private static final String COLUMN_ORDER_QUANTITY = "quantity";
+    private static final String COLUMN_ORDER_ITEM_PRICE = "price";
+    private static final String COLUMN_ORDER_ITEM_TOTAL = "total";
+
     private static final Map<String, Float> PRODUCT_PRICES = new HashMap<>();
     private static final Map<String, Integer> PRODUCT_THRESHOLDS = new HashMap<>();
 
@@ -82,14 +97,26 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             db.execSQL(inventoryQuery);
             Log.d(TAG, "Inventory table created successfully");
 
-            String salesQuery = "CREATE TABLE " + TABLE_SALES + "(" +
-                    COLUMN_SALE_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    COLUMN_PRODUCT_ID + " TEXT NOT NULL, " +
-                    COLUMN_QUANTITY + " INTEGER NOT NULL, " +
-                    COLUMN_TOTAL_AMOUNT + " FLOAT NOT NULL, " +
-                    COLUMN_SALE_DATE + " TEXT NOT NULL);";
-            db.execSQL(salesQuery);
-            Log.d(TAG, "Sales table created successfully");
+            String ordersQuery = "CREATE TABLE " + TABLE_ORDERS + "(" +
+                    COLUMN_ORDER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_ORDER_DATE + " TEXT NOT NULL, " +
+                    COLUMN_ORDER_TIME + " TEXT NOT NULL, " +
+                    COLUMN_ORDER_TOTAL + " FLOAT NOT NULL, " +
+                    COLUMN_ORDER_STATUS + " TEXT DEFAULT 'Completed');";
+            db.execSQL(ordersQuery);
+            Log.d(TAG, "Orders table created successfully");
+
+            String orderItemsQuery = "CREATE TABLE " + TABLE_ORDER_ITEMS + "(" +
+                    COLUMN_ORDER_ITEM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_ORDER_ID_FK + " INTEGER NOT NULL, " +
+                    COLUMN_ORDER_PRODUCT_ID + " INTEGER NOT NULL, " +
+                    COLUMN_ORDER_QUANTITY + " INTEGER NOT NULL, " +
+                    COLUMN_ORDER_ITEM_PRICE + " FLOAT NOT NULL, " +
+                    COLUMN_ORDER_ITEM_TOTAL + " FLOAT NOT NULL, " +
+                    "FOREIGN KEY(" + COLUMN_ORDER_ID_FK + ") REFERENCES " + TABLE_ORDERS + "(" + COLUMN_ORDER_ID + "), " +
+                    "FOREIGN KEY(" + COLUMN_ORDER_PRODUCT_ID + ") REFERENCES " + TABLE_INVENTORY + "(" + COLUMN_ID + "));";
+            db.execSQL(orderItemsQuery);
+            Log.d(TAG, "Order items table created successfully");
 
             String usersQuery = "CREATE TABLE " + TABLE_USERS + " (" +
                     COLUMN_USER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -705,24 +732,40 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
 
                     db.beginTransaction();
                     try {
+                        // Update inventory quantity
                         ContentValues updateValues = new ContentValues();
                         updateValues.put(COLUMN_QTY, newQty);
                         db.update(TABLE_INVENTORY, updateValues, COLUMN_ID + " = ?", new String[]{itemId});
 
-                        ContentValues saleValues = new ContentValues();
-                        saleValues.put(COLUMN_PRODUCT_ID, itemId);
-                        saleValues.put(COLUMN_QUANTITY, quantity);
-                        saleValues.put(COLUMN_TOTAL_AMOUNT, totalAmount);
-                        saleValues.put(COLUMN_SALE_DATE, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+                        // Create new order
+                        String currentDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+                        String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
 
-                        long saleId = db.insert(TABLE_SALES, null, saleValues);
+                        ContentValues orderValues = new ContentValues();
+                        orderValues.put(COLUMN_ORDER_DATE, currentDate);
+                        orderValues.put(COLUMN_ORDER_TIME, currentTime);
+                        orderValues.put(COLUMN_ORDER_TOTAL, totalAmount);
+                        orderValues.put(COLUMN_ORDER_STATUS, "Completed");
 
-                        if (saleId != -1) {
-                            db.setTransactionSuccessful();
-                            return String.format("Sold %d %s for ₱%.2f", quantity, productName, totalAmount);
-                        } else {
-                            return "Failed to record sale";
+                        long orderId = db.insert(TABLE_ORDERS, null, orderValues);
+
+                        if (orderId != -1) {
+                            // Add order item
+                            ContentValues orderItemValues = new ContentValues();
+                            orderItemValues.put(COLUMN_ORDER_ID_FK, orderId);
+                            orderItemValues.put(COLUMN_ORDER_PRODUCT_ID, itemId);
+                            orderItemValues.put(COLUMN_ORDER_QUANTITY, quantity);
+                            orderItemValues.put(COLUMN_ORDER_ITEM_PRICE, price);
+                            orderItemValues.put(COLUMN_ORDER_ITEM_TOTAL, totalAmount);
+
+                            long orderItemId = db.insert(TABLE_ORDER_ITEMS, null, orderItemValues);
+
+                            if (orderItemId != -1) {
+                                db.setTransactionSuccessful();
+                                return String.format("Sold %d %s for ₱%.2f", quantity, productName, totalAmount);
+                            }
                         }
+                        return "Failed to record sale";
                     } catch (Exception e) {
                         return "Error recording sale: " + e.getMessage();
                     } finally {
@@ -742,6 +785,104 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             }
             if (db != null && db.isOpen()) {
                 db.close();
+            }
+        }
+    }
+
+    public List<Order> getAllOrders() {
+        List<Order> orders = new ArrayList<>();
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        
+        try {
+            db = this.getReadableDatabase();
+            
+            // Always sort by date and time in descending order (newest first)
+            String orderBy = COLUMN_ORDER_DATE + " DESC, " + COLUMN_ORDER_TIME + " DESC";
+            
+            cursor = db.query(TABLE_ORDERS,
+                    new String[]{COLUMN_ORDER_ID, COLUMN_ORDER_DATE, COLUMN_ORDER_TIME, COLUMN_ORDER_TOTAL, COLUMN_ORDER_STATUS},
+                    null, null, null, null, orderBy);
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String id = cursor.getString(0);
+                    String date = cursor.getString(1);
+                    String time = cursor.getString(2);
+                    double total = cursor.getDouble(3);
+                    String status = cursor.getString(4);
+                    
+                    Order order = new Order(id, date, time, total, status);
+                    
+                    // Get order items
+                    Cursor itemsCursor = db.query(TABLE_ORDER_ITEMS,
+                            new String[]{COLUMN_ORDER_PRODUCT_ID, COLUMN_ORDER_QUANTITY, COLUMN_ORDER_ITEM_PRICE, COLUMN_ORDER_ITEM_TOTAL},
+                            COLUMN_ORDER_ID_FK + " = ?",
+                            new String[]{id},
+                            null, null, null);
+                    
+                    if (itemsCursor != null && itemsCursor.moveToFirst()) {
+                        do {
+                            String productId = itemsCursor.getString(0);
+                            int quantity = itemsCursor.getInt(1);
+                            double price = itemsCursor.getDouble(2);
+                            double itemTotal = itemsCursor.getDouble(3);
+                            
+                            // Get product name
+                            Cursor productCursor = db.query(TABLE_INVENTORY,
+                                    new String[]{COLUMN_NAME},
+                                    COLUMN_ID + " = ?",
+                                    new String[]{productId},
+                                    null, null, null);
+                            
+                            String productName = "";
+                            if (productCursor != null && productCursor.moveToFirst()) {
+                                productName = productCursor.getString(0);
+                            }
+                            if (productCursor != null) {
+                                productCursor.close();
+                            }
+                            
+                            order.addItem(new Order.OrderItem(productId, productName, quantity, price, itemTotal));
+                        } while (itemsCursor.moveToNext());
+                    }
+                    if (itemsCursor != null) {
+                        itemsCursor.close();
+                    }
+                    
+                    orders.add(order);
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting orders: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        
+        return orders;
+    }
+
+    public void deleteAllOrders() {
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            db.beginTransaction();
+            db.delete(TABLE_ORDER_ITEMS, null, null);
+            db.delete(TABLE_ORDERS, null, null);
+            db.setTransactionSuccessful();
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting all orders: " + e.getMessage());
+        } finally {
+            if (db != null) {
+                db.endTransaction();
+                if (db.isOpen()) {
+                    db.close();
+                }
             }
         }
     }
@@ -873,6 +1014,110 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         
         cursor.close();
         return outOfStockItems;
+    }
+
+    public double getTodayRevenue() {
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        double revenue = 0.0;
+        
+        try {
+            db = this.getReadableDatabase();
+            String today = new java.text.SimpleDateFormat("yyyy-MM-dd").format(new java.util.Date());
+            
+            String query = "SELECT COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as today_revenue " +
+                         "FROM " + TABLE_ORDERS + " " +
+                         "WHERE date(" + COLUMN_ORDER_DATE + ") = ? AND " + COLUMN_ORDER_STATUS + " = 'Completed'";
+            
+            cursor = db.rawQuery(query, new String[]{today});
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                revenue = cursor.getDouble(0);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting today's revenue: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        
+        return revenue;
+    }
+
+    public double getWeeklyRevenue() {
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        double revenue = 0.0;
+        
+        try {
+            db = this.getReadableDatabase();
+            
+            // Get the date 7 days ago
+            java.util.Calendar calendar = java.util.Calendar.getInstance();
+            calendar.add(java.util.Calendar.DAY_OF_YEAR, -7);
+            String sevenDaysAgo = new java.text.SimpleDateFormat("yyyy-MM-dd").format(calendar.getTime());
+            
+            String query = "SELECT COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as weekly_revenue " +
+                         "FROM " + TABLE_ORDERS + " " +
+                         "WHERE date(" + COLUMN_ORDER_DATE + ") >= ? AND " + COLUMN_ORDER_STATUS + " = 'Completed'";
+            
+            cursor = db.rawQuery(query, new String[]{sevenDaysAgo});
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                revenue = cursor.getDouble(0);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting weekly revenue: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        
+        return revenue;
+    }
+
+    public double getMonthlyRevenue() {
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        double revenue = 0.0;
+        
+        try {
+            db = this.getReadableDatabase();
+            
+            // Get the first day of current month
+            java.util.Calendar calendar = java.util.Calendar.getInstance();
+            calendar.set(java.util.Calendar.DAY_OF_MONTH, 1);
+            String firstDayOfMonth = new java.text.SimpleDateFormat("yyyy-MM-dd").format(calendar.getTime());
+            
+            String query = "SELECT COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as monthly_revenue " +
+                         "FROM " + TABLE_ORDERS + " " +
+                         "WHERE date(" + COLUMN_ORDER_DATE + ") >= ? AND " + COLUMN_ORDER_STATUS + " = 'Completed'";
+            
+            cursor = db.rawQuery(query, new String[]{firstDayOfMonth});
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                revenue = cursor.getDouble(0);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting monthly revenue: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        
+        return revenue;
     }
 }
 

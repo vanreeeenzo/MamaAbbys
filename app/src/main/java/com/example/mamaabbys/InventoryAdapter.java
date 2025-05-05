@@ -68,19 +68,22 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.Inve
         holder.stockInfo.setText(item.getStockInfo());
         holder.itemIcon.setImageResource(item.getIconResId());
         
-        // Set text color based on stock status
+        // Set text color and button state based on stock status
         if (item.isOutOfStock()) {
             holder.itemName.setTextColor(Color.RED);
             holder.stockInfo.setTextColor(Color.RED);
             holder.sellButton.setEnabled(false);
+            holder.sellButton.setAlpha(0.5f); // Make button appear greyed out
         } else if (item.isLowStock()) {
             holder.itemName.setTextColor(Color.parseColor("#FFA500")); // Orange color for low stock
             holder.stockInfo.setTextColor(Color.parseColor("#FFA500"));
             holder.sellButton.setEnabled(true);
+            holder.sellButton.setAlpha(1.0f);
         } else {
             holder.itemName.setTextColor(Color.BLACK);
             holder.stockInfo.setTextColor(Color.GRAY);
             holder.sellButton.setEnabled(true);
+            holder.sellButton.setAlpha(1.0f);
         }
         
         holder.itemView.setOnClickListener(v -> {
@@ -90,7 +93,7 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.Inve
         });
 
         holder.sellButton.setOnClickListener(v -> {
-            if (sellListener != null) {
+            if (!item.isOutOfStock() && sellListener != null) {
                 sellListener.onSellClick(item);
             }
         });
