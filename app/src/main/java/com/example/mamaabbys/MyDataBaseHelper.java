@@ -1128,6 +1128,125 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         
         return revenue;
     }
+
+    public boolean updateProductPrice(String productId, float newPrice) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            ContentValues values = new ContentValues();
+            values.put(COLUMN_PRICE, newPrice);
+
+            int rowsAffected = db.update(TABLE_INVENTORY, values, 
+                COLUMN_ID + " = ?", new String[]{productId});
+            return rowsAffected > 0;
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating product price: " + e.getMessage());
+            return false;
+        } finally {
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+    }
+
+    public List<Product> getAllProducts() {
+        List<Product> products = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            cursor = db.query(TABLE_INVENTORY, null, null, null, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String id = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ID));
+                    String name = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_NAME));
+                    String category = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_CATEGORY));
+                    float price = cursor.getFloat(cursor.getColumnIndexOrThrow(COLUMN_PRICE));
+
+                    products.add(new Product(id, name, category, price));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting all products: " + e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        return products;
+    }
+
+    public float getProductPrice(String fullProductName) {
+        // First try to get from database
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            String[] parts = fullProductName.split(" - ", 2);
+            if (parts.length == 2) {
+                String category = parts[0];
+                String name = parts[1];
+                cursor = db.query(TABLE_INVENTORY,
+                        new String[]{COLUMN_PRICE},
+                        COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ?",
+                        new String[]{name, category},
+                        null, null, null);
+                
+                if (cursor != null && cursor.moveToFirst()) {
+                    return cursor.getFloat(0);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting product price from database: " + e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        // Fallback to predefined price if not found in database
+        return PRODUCT_PRICES.getOrDefault(fullProductName, 0.0f);
+    }
+
+    public boolean updatePredefinedPrice(String fullProductName, float newPrice) {
+        SQLiteDatabase db = null;
+        try {
+            String[] parts = fullProductName.split(" - ", 2);
+            if (parts.length != 2) {
+                return false;
+            }
+
+            String category = parts[0];
+            String name = parts[1];
+            
+            db = this.getWritableDatabase();
+            ContentValues values = new ContentValues();
+            values.put(COLUMN_PRICE, newPrice);
+
+            // Update the database
+            int rowsAffected = db.update(TABLE_INVENTORY,
+                    values,
+                    COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ?",
+                    new String[]{name, category});
+
+            if (rowsAffected > 0) {
+                // Update the in-memory map
+                PRODUCT_PRICES.put(fullProductName, newPrice);
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating product price: " + e.getMessage());
+            return false;
+        } finally {
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+    }
 }
 
 

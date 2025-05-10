@@ -81,11 +81,23 @@ public class MainActivity extends AppCompatActivity {
         try {
             notificationButton = findViewById(R.id.notificationButton);
             notificationBadge = findViewById(R.id.notificationBadge);
+            ImageButton settingsButton = findViewById(R.id.settingsButton);
             viewPager = findViewById(R.id.viewPager);
             tabLayout = findViewById(R.id.tabLayout);
             fab = findViewById(R.id.quickActionsBar);
             deleteAllButton = findViewById(R.id.deleteAllButton);
             dbHelper = new MyDataBaseHelper(this);
+
+            // Setup settings button click listener
+            settingsButton.setOnClickListener(v -> {
+                try {
+                    Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error starting SettingsActivity: " + e.getMessage());
+                    Toast.makeText(this, "Error opening settings", Toast.LENGTH_SHORT).show();
+                }
+            });
         } catch (Exception e) {
             Log.e(TAG, "Error initializing views: " + e.getMessage());
             throw e;
