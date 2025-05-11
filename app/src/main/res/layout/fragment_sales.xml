@@ -4,6 +4,42 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- Filter Buttons -->
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/filterChipGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        app:singleSelection="true"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/todayChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Today"
+            android:checkable="true"
+            android:checked="true"
+            style="@style/Widget.MaterialComponents.Chip.Choice" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/weeklyChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Weekly"
+            android:checkable="true"
+            style="@style/Widget.MaterialComponents.Chip.Choice" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/monthlyChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Monthly"
+            android:checkable="true"
+            style="@style/Widget.MaterialComponents.Chip.Choice" />
+
+    </com.google.android.material.chip.ChipGroup>
+
     <androidx.cardview.widget.CardView
         android:id="@+id/revenueCard"
         android:layout_width="match_parent"
@@ -11,7 +47,7 @@
         android:layout_margin="8dp"
         app:cardCornerRadius="8dp"
         app:cardElevation="4dp"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/filterChipGroup">
 
         <LinearLayout
             android:layout_width="match_parent"

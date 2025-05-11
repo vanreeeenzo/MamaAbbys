@@ -17,6 +17,7 @@ import java.util.Map;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Calendar;
 
 public class MyDataBaseHelper extends SQLiteOpenHelper {
 
@@ -1026,61 +1027,35 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     }
 
     public double getTodayRevenue() {
-        SQLiteDatabase db = null;
-        Cursor cursor = null;
-        double revenue = 0.0;
-        
-        try {
-            db = this.getReadableDatabase();
-            String today = new java.text.SimpleDateFormat("yyyy-MM-dd").format(new java.util.Date());
-            
-            String query = "SELECT COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as today_revenue " +
-                         "FROM " + TABLE_ORDERS + " " +
-                         "WHERE date(" + COLUMN_ORDER_DATE + ") = ? AND " + COLUMN_ORDER_STATUS + " = 'Completed'";
-            
-            cursor = db.rawQuery(query, new String[]{today});
-            
-            if (cursor != null && cursor.moveToFirst()) {
-                revenue = cursor.getDouble(0);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting today's revenue: " + e.getMessage());
-        } finally {
-            if (cursor != null && !cursor.isClosed()) {
-                cursor.close();
-            }
-            if (db != null && db.isOpen()) {
-                db.close();
-            }
-        }
-        
-        return revenue;
+        return getRevenueByDate(getTodayDate());
     }
 
     public double getWeeklyRevenue() {
+        return getRevenueByDateRange(getWeekStartDate(), getTodayDate());
+    }
+
+    public double getMonthlyRevenue() {
+        return getRevenueByDateRange(getMonthStartDate(), getTodayDate());
+    }
+
+    private double getRevenueByDate(String date) {
+        double revenue = 0.0;
         SQLiteDatabase db = null;
         Cursor cursor = null;
-        double revenue = 0.0;
         
         try {
             db = this.getReadableDatabase();
+            String query = "SELECT COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as total" +
+                         " FROM " + TABLE_ORDERS +
+                         " WHERE date(" + COLUMN_ORDER_DATE + ") = date(?)";
             
-            // Get the date 7 days ago
-            java.util.Calendar calendar = java.util.Calendar.getInstance();
-            calendar.add(java.util.Calendar.DAY_OF_YEAR, -7);
-            String sevenDaysAgo = new java.text.SimpleDateFormat("yyyy-MM-dd").format(calendar.getTime());
-            
-            String query = "SELECT COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as weekly_revenue " +
-                         "FROM " + TABLE_ORDERS + " " +
-                         "WHERE date(" + COLUMN_ORDER_DATE + ") >= ? AND " + COLUMN_ORDER_STATUS + " = 'Completed'";
-            
-            cursor = db.rawQuery(query, new String[]{sevenDaysAgo});
+            cursor = db.rawQuery(query, new String[]{date});
             
             if (cursor != null && cursor.moveToFirst()) {
                 revenue = cursor.getDouble(0);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting weekly revenue: " + e.getMessage());
+            Log.e(TAG, "Error getting revenue by date: " + e.getMessage());
         } finally {
             if (cursor != null && !cursor.isClosed()) {
                 cursor.close();
@@ -1093,30 +1068,24 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return revenue;
     }
 
-    public double getMonthlyRevenue() {
+    private double getRevenueByDateRange(String startDate, String endDate) {
+        double revenue = 0.0;
         SQLiteDatabase db = null;
         Cursor cursor = null;
-        double revenue = 0.0;
         
         try {
             db = this.getReadableDatabase();
+            String query = "SELECT COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as total" +
+                         " FROM " + TABLE_ORDERS +
+                         " WHERE date(" + COLUMN_ORDER_DATE + ") BETWEEN date(?) AND date(?)";
             
-            // Get the first day of current month
-            java.util.Calendar calendar = java.util.Calendar.getInstance();
-            calendar.set(java.util.Calendar.DAY_OF_MONTH, 1);
-            String firstDayOfMonth = new java.text.SimpleDateFormat("yyyy-MM-dd").format(calendar.getTime());
-            
-            String query = "SELECT COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as monthly_revenue " +
-                         "FROM " + TABLE_ORDERS + " " +
-                         "WHERE date(" + COLUMN_ORDER_DATE + ") >= ? AND " + COLUMN_ORDER_STATUS + " = 'Completed'";
-            
-            cursor = db.rawQuery(query, new String[]{firstDayOfMonth});
+            cursor = db.rawQuery(query, new String[]{startDate, endDate});
             
             if (cursor != null && cursor.moveToFirst()) {
                 revenue = cursor.getDouble(0);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting monthly revenue: " + e.getMessage());
+            Log.e(TAG, "Error getting revenue by date range: " + e.getMessage());
         } finally {
             if (cursor != null && !cursor.isClosed()) {
                 cursor.close();
@@ -1127,6 +1096,25 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
         
         return revenue;
+    }
+
+    private String getTodayDate() {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        return dateFormat.format(new Date());
+    }
+
+    private String getWeekStartDate() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.DAY_OF_WEEK, calendar.getFirstDayOfWeek());
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        return dateFormat.format(calendar.getTime());
+    }
+
+    private String getMonthStartDate() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.DAY_OF_MONTH, 1);
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        return dateFormat.format(calendar.getTime());
     }
 
     public boolean updateProductPrice(String productId, float newPrice) {
@@ -1246,6 +1234,129 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 db.close();
             }
         }
+    }
+
+    public List<Order> getOrdersByDate(String date) {
+        List<Order> orders = new ArrayList<>();
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        
+        try {
+            db = this.getReadableDatabase();
+            String query = "SELECT * FROM " + TABLE_ORDERS + 
+                         " WHERE date(" + COLUMN_ORDER_DATE + ") = date(?)" +
+                         " ORDER BY " + COLUMN_ORDER_DATE + " DESC, " + COLUMN_ORDER_TIME + " DESC";
+            
+            cursor = db.rawQuery(query, new String[]{date});
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String id = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER_ID));
+                    String orderDate = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER_DATE));
+                    String orderTime = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER_TIME));
+                    double total = cursor.getDouble(cursor.getColumnIndexOrThrow(COLUMN_ORDER_TOTAL));
+                    String status = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER_STATUS));
+                    
+                    Order order = new Order(id, orderDate, orderTime, total, status);
+                    order.setItems(getOrderItems(id));
+                    orders.add(order);
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting orders by date: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        
+        return orders;
+    }
+
+    public List<Order> getOrdersByDateRange(String startDate, String endDate) {
+        List<Order> orders = new ArrayList<>();
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        
+        try {
+            db = this.getReadableDatabase();
+            String query = "SELECT * FROM " + TABLE_ORDERS + 
+                         " WHERE date(" + COLUMN_ORDER_DATE + ") BETWEEN date(?) AND date(?)" +
+                         " ORDER BY " + COLUMN_ORDER_DATE + " DESC, " + COLUMN_ORDER_TIME + " DESC";
+            
+            cursor = db.rawQuery(query, new String[]{startDate, endDate});
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String id = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER_ID));
+                    String orderDate = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER_DATE));
+                    String orderTime = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER_TIME));
+                    double total = cursor.getDouble(cursor.getColumnIndexOrThrow(COLUMN_ORDER_TOTAL));
+                    String status = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER_STATUS));
+                    
+                    Order order = new Order(id, orderDate, orderTime, total, status);
+                    order.setItems(getOrderItems(id));
+                    orders.add(order);
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting orders by date range: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        
+        return orders;
+    }
+
+    private List<Order.OrderItem> getOrderItems(String orderId) {
+        List<Order.OrderItem> items = new ArrayList<>();
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        
+        try {
+            db = this.getReadableDatabase();
+            String query = "SELECT oi." + COLUMN_ORDER_PRODUCT_ID + ", " +
+                         "i." + COLUMN_NAME + ", " +
+                         "oi." + COLUMN_ORDER_QUANTITY + ", " +
+                         "oi." + COLUMN_ORDER_ITEM_PRICE + ", " +
+                         "oi." + COLUMN_ORDER_ITEM_TOTAL + " " +
+                         "FROM " + TABLE_ORDER_ITEMS + " oi " +
+                         "LEFT JOIN " + TABLE_INVENTORY + " i ON oi." + COLUMN_ORDER_PRODUCT_ID + " = i." + COLUMN_ID + " " +
+                         "WHERE oi." + COLUMN_ORDER_ID_FK + " = ?";
+            
+            cursor = db.rawQuery(query, new String[]{orderId});
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String productId = cursor.getString(0);
+                    String productName = cursor.getString(1);
+                    int quantity = cursor.getInt(2);
+                    double price = cursor.getDouble(3);
+                    double total = cursor.getDouble(4);
+                    
+                    items.add(new Order.OrderItem(productId, productName, quantity, price, total));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting order items: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+        
+        return items;
     }
 }
 

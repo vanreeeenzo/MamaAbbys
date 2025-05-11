@@ -140,8 +140,8 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
 
                 List<InventoryItem> filteredItems = new ArrayList<>();
 
-                // If "All Categories" or "All Products" is selected, show all items
-                if (selectedCategory.equals("All Categories") || selectedProduct.equals("All Products")) {
+                // If "All Categories" is selected, show all items
+                if (selectedCategory.equals("All Categories")) {
                     currentItems = allItems;
                     requireActivity().runOnUiThread(() -> {
                         updateAdapter(allItems);
@@ -149,22 +149,30 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
                             swipeRefreshLayout.setRefreshing(false);
                         }
                         isLoading = false;
-                        
-                        // Check for out-of-stock items
-                        List<InventoryItem> outOfStockItems = dbHelper.getOutOfStockItems();
-                        if (!outOfStockItems.isEmpty()) {
-                            StringBuilder message = new StringBuilder("Out of Stock Items:\n");
-                            for (InventoryItem item : outOfStockItems) {
-                                message.append("- ").append(item.getName()).append("\n");
-                            }
-                            showErrorToast(message.toString());
-                        }
                     });
                     return;
                 }
 
+                // If "All Products" is selected for a specific category, show all items in that category
+                if (selectedProduct.equals("All Products")) {
+                    for (InventoryItem item : allItems) {
+                        if (item.getCategory().equals(selectedCategory)) {
+                            filteredItems.add(item);
+                        }
+                    }
+                    currentItems = filteredItems;
+                    requireActivity().runOnUiThread(() -> {
+                        updateAdapter(filteredItems);
+                        if (swipeRefreshLayout != null) {
+                            swipeRefreshLayout.setRefreshing(false);
+                        }
+                        isLoading = false;
+                    });
+                    return;
+                }
+
+                // Filter by both category and specific product
                 for (InventoryItem item : allItems) {
-                    // Check if the item matches both the selected category and product
                     if (item.getCategory().equals(selectedCategory) && 
                         item.getName().equals(selectedProduct)) {
                         filteredItems.add(item);
@@ -182,11 +190,11 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
             } catch (Exception e) {
                 Log.e(TAG, "Error loading inventory data: " + e.getMessage());
                 requireActivity().runOnUiThread(() -> {
-                    showErrorToast("Error loading inventory: " + e.getMessage());
                     if (swipeRefreshLayout != null) {
                         swipeRefreshLayout.setRefreshing(false);
                     }
                     isLoading = false;
+                    showErrorToast("Error loading inventory data");
                 });
             }
         }).start();
@@ -300,12 +308,15 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String selectedCategory = parent.getItemAtPosition(position).toString();
                 List<String> products = new ArrayList<>();
-                if (selectedCategory.equals("All Categories")) {
-                    products.clear();
-                    products.add("All Products");
-                } else {
-                    products = productCategories.get(selectedCategory);
+                products.add("All Products"); // Always add "All Products" as first option
+                
+                if (!selectedCategory.equals("All Categories")) {
+                    List<String> categoryProducts = productCategories.get(selectedCategory);
+                    if (categoryProducts != null) {
+                        products.addAll(categoryProducts);
+                    }
                 }
+                
                 ArrayAdapter<String> productsAdapter = new ArrayAdapter<>(
                     requireContext(),
                     android.R.layout.simple_spinner_item,

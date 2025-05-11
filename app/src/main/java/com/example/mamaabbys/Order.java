@@ -49,6 +49,11 @@ public class Order implements Serializable {
         items.add(item);
     }
 
+    public void setItems(List<OrderItem> items) {
+        this.items.clear();
+        this.items.addAll(items);
+    }
+
     public static class OrderItem implements Serializable {
         private String productId;
         private String productName;
