@@ -70,7 +70,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
                     app:boxStrokeColor="?attr/colorPrimary"
-                    app:hintTextColor="?attr/colorPrimary">
+                    app:hintTextColor="?attr/colorPrimary"
+                    app:endIconMode="password_toggle"
+                    app:endIconTint="?attr/colorPrimary">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/passwordEditText"
@@ -96,7 +98,7 @@
                     android:id="@+id/registerTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Diri mag Reg Mga Tao"
+                    android:text="Sign Up"
                     android:textColor="?attr/colorPrimary"
                     android:textSize="14sp"
                     android:layout_gravity="center_horizontal" />

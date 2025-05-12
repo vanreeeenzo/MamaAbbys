@@ -59,6 +59,25 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
         holder.location.setText("Location: " + item.getLocation());
         holder.deliveryIcon.setImageResource(item.getIconResId());
 
+        // Show/hide overdue badge
+        boolean isOverdue = item.isOverdue();
+        android.util.Log.d("DeliveryAdapter", "Item: " + item.getOrderNumber() + 
+            ", Schedule: " + item.getSchedule() + 
+            ", IsOverdue: " + isOverdue + 
+            ", IsDone: " + item.isDone());
+            
+        if (isOverdue) {
+            holder.overdueBadge.setVisibility(View.VISIBLE);
+            // Show notification for overdue delivery
+            NotificationHelper.showNotification(
+                context,
+                "Overdue Delivery",
+                "Delivery for order " + item.getOrderNumber() + " is overdue! Scheduled for " + item.getSchedule()
+            );
+        } else {
+            holder.overdueBadge.setVisibility(View.GONE);
+        }
+
         if (item.isDone()) {
             holder.itemView.setBackgroundColor(ContextCompat.getColor(context, R.color.gray));
             holder.btnMarkAsDone.setVisibility(View.GONE);
@@ -86,7 +105,7 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
     }
 
     static class DeliveryViewHolder extends RecyclerView.ViewHolder {
-        TextView orderNumber, schedule, location;
+        TextView orderNumber, schedule, location, overdueBadge;
         ImageView deliveryIcon;
         Button btnMarkAsDone, btnCancelDelivery;
 
@@ -98,6 +117,7 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
             deliveryIcon = itemView.findViewById(R.id.deliveryIcon);
             btnMarkAsDone = itemView.findViewById(R.id.btnMarkAsDone);
             btnCancelDelivery = itemView.findViewById(R.id.btnCancelDelivery);
+            overdueBadge = itemView.findViewById(R.id.overdueBadge);
         }
     }
 }
