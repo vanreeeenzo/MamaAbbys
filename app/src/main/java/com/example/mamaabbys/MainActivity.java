@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -22,6 +23,7 @@ import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.firebase.database.FirebaseDatabase;
 
+import java.io.File;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
@@ -37,48 +39,209 @@ public class MainActivity extends AppCompatActivity {
     private ImageButton notificationButton;
     private TextView notificationBadge;
     private BroadcastReceiver notificationReadReceiver;
+    private BroadcastReceiver refreshReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
+        
         try {
+            // Set content view first
+            setContentView(R.layout.activity_main);
+            
+            // Initialize database with retry mechanism
+            initializeDatabase();
+            
+            // Initialize views after database
             initializeViews();
+            
+            // Setup UI components
             setupViewPager();
             setupClickListeners();
             setupPageChangeListener();
             setupNotificationButton();
             setupNotificationReceiver();
             
-            // Initialize Firebase in background with proper error handling
+            // Initialize Firebase in background
             initializeFirebase();
+            
+            // Initialize the refresh receiver
+            initializeRefreshReceiver();
+            
+            Log.d(TAG, "MainActivity initialized successfully");
         } catch (Exception e) {
-            Log.e(TAG, "Error in onCreate: " + e.getMessage());
-            Toast.makeText(this, "Error initializing app", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
+            handleInitializationError(e);
+        }
+    }
+
+    private void initializeDatabase() {
+        int maxRetries = 3;
+        int retryCount = 0;
+        Exception lastError = null;
+
+        while (retryCount < maxRetries) {
+            try {
+                if (dbHelper != null) {
+                    dbHelper.close();
+                }
+                dbHelper = new MyDataBaseHelper(this);
+                if (dbHelper == null) {
+                    throw new RuntimeException("Failed to initialize database");
+                }
+                // Test database connection
+                SQLiteDatabase db = dbHelper.getReadableDatabase();
+                if (db == null) {
+                    throw new RuntimeException("Failed to get readable database");
+                }
+                db.close();
+                return; // Success
+            } catch (Exception e) {
+                lastError = e;
+                retryCount++;
+                Log.e(TAG, "Database initialization attempt " + retryCount + " failed: " + e.getMessage());
+                if (retryCount < maxRetries) {
+                    try {
+                        Thread.sleep(1000); // Wait 1 second before retrying
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+        throw new RuntimeException("Failed to initialize database after " + maxRetries + " attempts: " + 
+            (lastError != null ? lastError.getMessage() : "Unknown error"));
+    }
+
+    private void handleInitializationError(Exception e) {
+        String errorMessage = "Error initializing app: " + e.getMessage();
+        Log.e(TAG, errorMessage, e);
+        
+        // Try to clean up resources
+        cleanupResources();
+        
+        // Show error dialog to user
+        new AlertDialog.Builder(this)
+            .setTitle("Initialization Error")
+            .setMessage("The app encountered an error while starting up. Would you like to:\n\n" +
+                       "1. Try again (Recommended)\n" +
+                       "2. Clear app data and try again\n" +
+                       "3. Close the app")
+            .setPositiveButton("Try Again", (dialog, which) -> {
+                recreate();
+            })
+            .setNeutralButton("Clear Data", (dialog, which) -> {
+                clearAppData();
+            })
+            .setNegativeButton("Close", (dialog, which) -> {
+                finish();
+            })
+            .setCancelable(false)
+            .show();
+    }
+
+    private void cleanupResources() {
+        try {
+            if (dbHelper != null) {
+                dbHelper.close();
+                dbHelper = null;
+            }
+            if (notificationReadReceiver != null) {
+                unregisterReceiver(notificationReadReceiver);
+                notificationReadReceiver = null;
+            }
+            if (refreshReceiver != null) {
+                unregisterReceiver(refreshReceiver);
+                refreshReceiver = null;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error during cleanup: " + e.getMessage());
+        }
+    }
+
+    private void clearAppData() {
+        try {
+            // Clear database
+            if (dbHelper != null) {
+                dbHelper.close();
+                dbHelper = null;
+            }
+            deleteDatabase(MyDataBaseHelper.DATABASE_NAME);
+            
+            // Clear shared preferences
+            getSharedPreferences("app_preferences", MODE_PRIVATE).edit().clear().apply();
+            
+            // Clear cache
+            File cacheDir = getCacheDir();
+            if (cacheDir != null && cacheDir.exists()) {
+                deleteRecursive(cacheDir);
+            }
+            
+            // Restart app
+            Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);
+            }
+            finish();
+        } catch (Exception e) {
+            Log.e(TAG, "Error clearing app data: " + e.getMessage());
+            Toast.makeText(this, "Error clearing app data: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void deleteRecursive(File fileOrDirectory) {
+        if (fileOrDirectory.isDirectory()) {
+            for (File child : fileOrDirectory.listFiles()) {
+                deleteRecursive(child);
+            }
+        }
+        fileOrDirectory.delete();
+    }
+
+    private void initializeRefreshReceiver() {
+        try {
+            refreshReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if ("com.example.mamaabbys.REFRESH_INVENTORY".equals(intent.getAction())) {
+                        runOnUiThread(() -> refreshInventoryList());
+                    }
+                }
+            };
+            registerReceiver(refreshReceiver, new IntentFilter("com.example.mamaabbys.REFRESH_INVENTORY"));
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing refresh receiver: " + e.getMessage());
+            // Don't throw, as this is not critical
         }
     }
 
     private void initializeFirebase() {
         new Thread(() -> {
             try {
-                FirebaseDatabase.getInstance().getReference()
-                    .child("Inventory")
-                    .child("Meat")
-                    .setValue("TJ Hotdog")
-                    .addOnCompleteListener(task -> {
-                        if (!task.isSuccessful()) {
-                            Log.e(TAG, "Firebase operation failed: " + task.getException());
-                        }
-                    });
+                if (FirebaseDatabase.getInstance() != null) {
+                    FirebaseDatabase.getInstance().setPersistenceEnabled(true);
+                    FirebaseDatabase.getInstance().getReference()
+                        .child("Inventory")
+                        .child("Meat")
+                        .setValue("TJ Hotdog")
+                        .addOnCompleteListener(task -> {
+                            if (!task.isSuccessful()) {
+                                Log.e(TAG, "Firebase operation failed: " + task.getException());
+                            }
+                        });
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Error initializing Firebase: " + e.getMessage());
+                // Don't show error to user as this is not critical
             }
         }).start();
     }
 
     private void initializeViews() {
         try {
+            // Initialize all views first
             notificationButton = findViewById(R.id.notificationButton);
             notificationBadge = findViewById(R.id.notificationBadge);
             ImageButton settingsButton = findViewById(R.id.settingsButton);
@@ -86,7 +249,12 @@ public class MainActivity extends AppCompatActivity {
             tabLayout = findViewById(R.id.tabLayout);
             fab = findViewById(R.id.quickActionsBar);
             deleteAllButton = findViewById(R.id.deleteAllButton);
-            dbHelper = new MyDataBaseHelper(this);
+
+            if (notificationButton == null || notificationBadge == null || 
+                settingsButton == null || viewPager == null || 
+                tabLayout == null || fab == null || deleteAllButton == null) {
+                throw new RuntimeException("Failed to initialize views");
+            }
 
             // Setup settings button click listener
             settingsButton.setOnClickListener(v -> {
@@ -99,8 +267,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         } catch (Exception e) {
-            Log.e(TAG, "Error initializing views: " + e.getMessage());
-            throw e;
+            Log.e(TAG, "Error initializing views: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to initialize views: " + e.getMessage());
         }
     }
 
@@ -294,8 +462,25 @@ public class MainActivity extends AppCompatActivity {
             if (dbHelper != null) {
                 dbHelper.close();
             }
+            if (refreshReceiver != null) {
+                unregisterReceiver(refreshReceiver);
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error in onDestroy: " + e.getMessage());
+        }
+    }
+
+    private void refreshInventoryList() {
+        try {
+            // Get the current fragment from the ViewPager2
+            Fragment currentFragment = getSupportFragmentManager()
+                .findFragmentByTag("f" + viewPager.getCurrentItem());
+            
+            if (currentFragment instanceof InventoryFragment) {
+                ((InventoryFragment) currentFragment).loadInventoryData();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error refreshing inventory list: " + e.getMessage());
         }
     }
 }

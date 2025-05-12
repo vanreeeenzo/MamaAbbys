@@ -2,6 +2,7 @@
 package com.example.mamaabbys;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -18,11 +19,15 @@ public class AddInventory extends AppCompatActivity {
     private MaterialButton saveButton;
     private MyDataBaseHelper myDB;
     private String selectedCategory, selectedProduct;
+    private android.os.Handler mainHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_inventory);
+
+        // Initialize handler for main thread
+        mainHandler = new android.os.Handler(getMainLooper());
 
         // Initialize database helper
         myDB = new MyDataBaseHelper(this);
@@ -76,40 +81,91 @@ public class AddInventory extends AppCompatActivity {
     }
 
     private void updateProductList(String category) {
+        if (category == null || category.equals("All Categories")) {
+            return;
+        }
         List<String> products = myDB.getProductsByCategory(category);
         ArrayAdapter<String> productAdapter = new ArrayAdapter<>(this,
             android.R.layout.simple_spinner_dropdown_item, products);
         productSpinner.setAdapter(productAdapter);
     }
 
+    private void showToast(final String message) {
+        mainHandler.post(() -> {
+            Toast.makeText(AddInventory.this, message, Toast.LENGTH_SHORT).show();
+            Log.d("AddInventory", "Toast message: " + message);
+        });
+    }
+
     private void saveInventoryItem() {
-        if (selectedCategory == null || selectedProduct == null) {
-            Toast.makeText(this, "Please select both category and product", Toast.LENGTH_SHORT).show();
+        if (selectedCategory == null || selectedCategory.equals("All Categories")) {
+            showToast("Please select a valid category");
+            return;
+        }
+
+        if (selectedProduct == null) {
+            showToast("Please select a product");
             return;
         }
 
         String quantityStr = quantityInput.getText().toString().trim();
         if (quantityStr.isEmpty()) {
-            Toast.makeText(this, "Please enter quantity", Toast.LENGTH_SHORT).show();
+            showToast("Please enter quantity");
             return;
         }
 
         try {
             int quantity = Integer.parseInt(quantityStr);
             if (quantity <= 0) {
-                Toast.makeText(this, "Quantity must be greater than 0", Toast.LENGTH_SHORT).show();
+                showToast("Quantity must be greater than 0");
                 return;
             }
-            myDB.addInventory(selectedProduct, selectedCategory, quantity);
-            
-            // Clear inputs
-            quantityInput.setText("");
-            categorySpinner.setSelection(0);
-            productSpinner.setSelection(0);
-            
-            Toast.makeText(this, "Item added successfully", Toast.LENGTH_SHORT).show();
+
+            // Disable save button to prevent multiple clicks
+            saveButton.setEnabled(false);
+
+            // Perform database operation in a background thread
+            new Thread(() -> {
+                try {
+                    Log.d("AddInventory", "Attempting to add inventory item: " + selectedProduct + 
+                        " in category: " + selectedCategory + " with quantity: " + quantity);
+                    
+                    boolean success = myDB.addInventory(selectedProduct, selectedCategory, quantity);
+                    
+                    runOnUiThread(() -> {
+                        if (success) {
+                            Log.d("AddInventory", "Successfully added inventory item");
+                            // Clear inputs
+                            quantityInput.setText("");
+                            categorySpinner.setSelection(0);
+                            productSpinner.setSelection(0);
+                            showToast("Item added successfully");
+                            finish(); // Close the activity after successful addition
+                        } else {
+                            Log.e("AddInventory", "Failed to add inventory item");
+                            showToast("Failed to add item. Please try again.");
+                            saveButton.setEnabled(true); // Re-enable save button on error
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e("AddInventory", "Error adding inventory item: " + e.getMessage(), e);
+                    runOnUiThread(() -> {
+                        showToast("Error: " + e.getMessage());
+                        saveButton.setEnabled(true); // Re-enable save button on error
+                    });
+                }
+            }).start();
         } catch (NumberFormatException e) {
-            Toast.makeText(this, "Please enter a valid quantity", Toast.LENGTH_SHORT).show();
+            Log.e("AddInventory", "Invalid quantity format: " + e.getMessage());
+            showToast("Please enter a valid quantity");
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (myDB != null) {
+            myDB.close();
         }
     }
 }
