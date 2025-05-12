@@ -16,10 +16,20 @@ public class Login extends AppCompatActivity {
     EditText usernameEditText, passwordEditText;
     Button loginButton;
     TextView registerTextView;
+    SessionManager sessionManager;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        // Check if user is already logged in
+        sessionManager = new SessionManager(this);
+        if (sessionManager.isLoggedIn()) {
+            startActivity(new Intent(Login.this, MainActivity.class));
+            finish();
+            return;
+        }
+
         setContentView(R.layout.login);
 
         usernameEditText = findViewById(R.id.usernameEditText);
@@ -39,12 +49,14 @@ public class Login extends AppCompatActivity {
                 String passwords = "123";
 
                 if (username.equals(usernames) && password.equals(passwords)){
+                    sessionManager.setLogin(true, username);
                     Intent intent = new Intent(Login.this, MainActivity.class);
                     startActivity(intent);
                     finish();
                 } else {
                     boolean Logged = myDB.checkUser(username, password);
                     if (Logged) {
+                        sessionManager.setLogin(true, username);
                         Intent intent = new Intent(Login.this, MainActivity.class);
                         startActivity(intent);
                         finish();

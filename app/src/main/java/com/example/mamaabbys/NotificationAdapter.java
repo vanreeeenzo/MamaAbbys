@@ -3,6 +3,7 @@ package com.example.mamaabbys;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
@@ -50,9 +51,11 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
         if (notification.isRead()) {
             holder.cardView.setCardBackgroundColor(holder.itemView.getContext().getResources().getColor(android.R.color.darker_gray));
             holder.unreadBadge.setVisibility(View.GONE);
+            holder.markAsReadButton.setVisibility(View.GONE);
         } else {
             holder.cardView.setCardBackgroundColor(holder.itemView.getContext().getResources().getColor(android.R.color.white));
             holder.unreadBadge.setVisibility(View.VISIBLE);
+            holder.markAsReadButton.setVisibility(View.VISIBLE);
         }
 
         holder.deleteButton.setOnClickListener(v -> {
@@ -88,7 +91,7 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
         TextView orderDetailsTextView;
         TextView dateTimeTextView;
         ImageButton deleteButton;
-        ImageButton markAsReadButton;
+        Button markAsReadButton;
 
         NotificationViewHolder(View itemView) {
             super(itemView);

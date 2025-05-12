@@ -38,8 +38,10 @@ public class MainActivity extends AppCompatActivity {
     private MyDataBaseHelper dbHelper;
     private ImageButton notificationButton;
     private TextView notificationBadge;
+    private TextView welcomeText;
     private BroadcastReceiver notificationReadReceiver;
     private BroadcastReceiver refreshReceiver;
+    private SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +50,9 @@ public class MainActivity extends AppCompatActivity {
         try {
             // Set content view first
             setContentView(R.layout.activity_main);
+            
+            // Initialize session manager
+            sessionManager = new SessionManager(this);
             
             // Initialize database with retry mechanism
             initializeDatabase();
@@ -68,10 +73,20 @@ public class MainActivity extends AppCompatActivity {
             // Initialize the refresh receiver
             initializeRefreshReceiver();
             
+            // Update welcome text with username
+            updateWelcomeText();
+            
             Log.d(TAG, "MainActivity initialized successfully");
         } catch (Exception e) {
             Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
             handleInitializationError(e);
+        }
+    }
+
+    private void updateWelcomeText() {
+        String username = sessionManager.getUsername();
+        if (welcomeText != null && username != null && !username.isEmpty()) {
+            welcomeText.setText("Welcome back, " + username);
         }
     }
 
@@ -244,6 +259,7 @@ public class MainActivity extends AppCompatActivity {
             // Initialize all views first
             notificationButton = findViewById(R.id.notificationButton);
             notificationBadge = findViewById(R.id.notificationBadge);
+            welcomeText = findViewById(R.id.welcomeText);
             ImageButton settingsButton = findViewById(R.id.settingsButton);
             viewPager = findViewById(R.id.viewPager);
             tabLayout = findViewById(R.id.tabLayout);
@@ -252,7 +268,8 @@ public class MainActivity extends AppCompatActivity {
 
             if (notificationButton == null || notificationBadge == null || 
                 settingsButton == null || viewPager == null || 
-                tabLayout == null || fab == null || deleteAllButton == null) {
+                tabLayout == null || fab == null || deleteAllButton == null ||
+                welcomeText == null) {
                 throw new RuntimeException("Failed to initialize views");
             }
 

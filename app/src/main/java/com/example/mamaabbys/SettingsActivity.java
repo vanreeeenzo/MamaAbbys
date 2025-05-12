@@ -16,6 +16,7 @@ public class SettingsActivity extends AppCompatActivity implements SettingsAdapt
     private SettingsAdapter adapter;
     private List<SettingsItem> settingsItems;
     private MyDataBaseHelper dbHelper;
+    private SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -23,14 +24,21 @@ public class SettingsActivity extends AppCompatActivity implements SettingsAdapt
         try {
             setContentView(R.layout.activity_settings);
 
-            // Initialize database helper
+            sessionManager = new SessionManager(this);
             dbHelper = new MyDataBaseHelper(this);
-
-            // Initialize views
-            ImageButton backButton = findViewById(R.id.backButton);
             settingsRecyclerView = findViewById(R.id.settingsRecyclerView);
+            settingsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+
+            // Initialize settings items
+            settingsItems = new ArrayList<>();
+            settingsItems.add(new SettingsItem("Edit Prices", "Manage product prices"));
+            settingsItems.add(new SettingsItem("Logout", "Sign out from your account"));
+
+            adapter = new SettingsAdapter(settingsItems, this);
+            settingsRecyclerView.setAdapter(adapter);
 
             // Setup back button with error handling
+            ImageButton backButton = findViewById(R.id.backButton);
             backButton.setOnClickListener(v -> {
                 try {
                     finish();
@@ -40,18 +48,6 @@ public class SettingsActivity extends AppCompatActivity implements SettingsAdapt
                     onBackPressed();
                 }
             });
-
-            // Setup RecyclerView
-            settingsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-            settingsItems = new ArrayList<>();
-            
-            // Add settings items
-            settingsItems.add(new SettingsItem("Account Settings", "Manage your account preferences"));
-            settingsItems.add(new SettingsItem("Notifications", "Configure notification settings"));
-            settingsItems.add(new SettingsItem("Edit Prices", "View and update product prices"));
-
-            adapter = new SettingsAdapter(settingsItems, this);
-            settingsRecyclerView.setAdapter(adapter);
         } catch (Exception e) {
             Log.e("SettingsActivity", "Error in onCreate: " + e.getMessage());
             Toast.makeText(this, "Error initializing settings", Toast.LENGTH_SHORT).show();
@@ -63,11 +59,15 @@ public class SettingsActivity extends AppCompatActivity implements SettingsAdapt
     public void onSettingsItemClick(SettingsItem item) {
         try {
             if (item.getTitle().equals("Edit Prices")) {
-                Intent intent = new Intent(SettingsActivity.this, EditPricesActivity.class);
+                Intent intent = new Intent(this, EditPricesActivity.class);
                 startActivity(intent);
-                return;
+            } else if (item.getTitle().equals("Logout")) {
+                sessionManager.logout();
+                Intent intent = new Intent(this, Login.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                finish();
             }
-            // Handle other settings items if needed
         } catch (Exception e) {
             Log.e("SettingsActivity", "Error handling settings item click: " + e.getMessage());
             Toast.makeText(this, "Error opening settings option", Toast.LENGTH_SHORT).show();

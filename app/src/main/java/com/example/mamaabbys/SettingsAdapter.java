@@ -8,7 +8,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 
-public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.SettingsViewHolder> {
+public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.ViewHolder> {
     private List<SettingsItem> settingsItems;
     private OnSettingsItemClickListener listener;
 
@@ -23,17 +23,17 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.Settin
 
     @NonNull
     @Override
-    public SettingsViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_settings, parent, false);
-        return new SettingsViewHolder(view);
+        return new ViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull SettingsViewHolder holder, int position) {
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         SettingsItem item = settingsItems.get(position);
-        holder.titleTextView.setText(item.getTitle());
-        holder.descriptionTextView.setText(item.getDescription());
+        holder.titleText.setText(item.getTitle());
+        holder.descriptionText.setText(item.getDescription());
 
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
@@ -47,14 +47,14 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.Settin
         return settingsItems.size();
     }
 
-    static class SettingsViewHolder extends RecyclerView.ViewHolder {
-        TextView titleTextView;
-        TextView descriptionTextView;
+    static class ViewHolder extends RecyclerView.ViewHolder {
+        TextView titleText;
+        TextView descriptionText;
 
-        SettingsViewHolder(View itemView) {
+        ViewHolder(View itemView) {
             super(itemView);
-            titleTextView = itemView.findViewById(R.id.settingsTitle);
-            descriptionTextView = itemView.findViewById(R.id.settingsDescription);
+            titleText = itemView.findViewById(R.id.settingsTitle);
+            descriptionText = itemView.findViewById(R.id.settingsDescription);
         }
     }
 } 
