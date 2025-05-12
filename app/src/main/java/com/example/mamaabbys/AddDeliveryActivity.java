@@ -3,6 +3,8 @@ package com.example.mamaabbys;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -68,6 +70,37 @@ public class AddDeliveryActivity extends AppCompatActivity {
                 finish();
             } else {
                 Toast.makeText(this, "Failed to save delivery", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Force CAPSLOCK for Order Details
+        editTextOrder.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                String upper = s.toString().toUpperCase();
+                if (!upper.equals(s.toString())) {
+                    editTextOrder.setText(upper);
+                    editTextOrder.setSelection(upper.length());
+                }
+            }
+        });
+        // Force CAPSLOCK for Location
+        editTextLocation.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                String upper = s.toString().toUpperCase();
+                if (!upper.equals(s.toString())) {
+                    editTextLocation.setText(upper);
+                    editTextLocation.setSelection(upper.length());
+                }
             }
         });
     }
