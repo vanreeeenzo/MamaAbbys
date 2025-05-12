@@ -1,5 +1,10 @@
 package com.example.mamaabbys;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+
 public class DeliveryItem {
     private String id;
     private String orderNumber;
@@ -43,5 +48,24 @@ public class DeliveryItem {
 
     public void setDone(boolean done) {
         this.isDone = done;
+    }
+
+    public boolean isOverdue() {
+        try {
+            // Extract date and time from schedule string (format: "Scheduled for yyyy-MM-dd at HH:mm")
+            String[] parts = schedule.split("for ")[1].split(" at ");
+            String dateStr = parts[0];
+            String timeStr = parts[1];
+            
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+            Date deliveryDateTime = sdf.parse(dateStr + " " + timeStr);
+            Date currentDateTime = new Date();
+            
+            // Return true if delivery date/time is before current date/time and not done
+            return deliveryDateTime.before(currentDateTime) && !isDone;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }
