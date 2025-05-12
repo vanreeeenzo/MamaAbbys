@@ -12,8 +12,10 @@ import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -23,8 +25,8 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
 
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
-    private static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 7;
+    public static final String DATABASE_NAME = "MamaAbbys.db";
+    private static final int DATABASE_VERSION = 8;
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
@@ -76,138 +78,395 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String COLUMN_ORDER_ITEM_PRICE = "price";
     private static final String COLUMN_ORDER_ITEM_TOTAL = "total";
 
+    private static final String TABLE_PRODUCT_PRICES = "product_prices";
+
     private static final Map<String, Float> PRODUCT_PRICES = new HashMap<>();
     private static final Map<String, Integer> PRODUCT_THRESHOLDS = new HashMap<>();
 
     public MyDataBaseHelper(@Nullable Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
         this.context = context;
-        initializeProductPrices();
-        initializeProductThresholds();
+        
+        try {
+            // Get a writable database to ensure it's created
+            SQLiteDatabase db = getWritableDatabase();
+            if (db == null) {
+                throw new RuntimeException("Failed to get writable database");
+            }
+            
+            // Verify database integrity
+            if (!db.isDatabaseIntegrityOk()) {
+                Log.e(TAG, "Database integrity check failed");
+                // Try to recover by recreating the database
+                context.deleteDatabase(DATABASE_NAME);
+                db = getWritableDatabase();
+                if (db == null) {
+                    throw new RuntimeException("Failed to recreate database after integrity check");
+                }
+            }
+            
+            // Verify all required tables exist and have correct schema
+            verifyTablesExist(db);
+            
+            // Initialize data only if tables are empty
+            if (isTablesEmpty(db)) {
+                initializeProductPrices();
+                initializeProductThresholds();
+                insertInitialPrices(db);
+            }
+            
+            db.close();
+            Log.d(TAG, "Database initialized successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing database: " + e.getMessage(), e);
+            // Try to recover by deleting and recreating the database
+            try {
+                if (context != null) {
+                    context.deleteDatabase(DATABASE_NAME);
+                    SQLiteDatabase db = getWritableDatabase();
+                    if (db != null) {
+                        db.close();
+                    }
+                }
+            } catch (Exception recoveryError) {
+                Log.e(TAG, "Error during database recovery: " + recoveryError.getMessage(), recoveryError);
+            }
+            throw new RuntimeException("Failed to initialize database: " + e.getMessage());
+        }
+    }
+
+    private boolean isTablesEmpty(SQLiteDatabase db) {
+        try {
+            // Check if product_prices table is empty
+            Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_PRODUCT_PRICES, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int count = cursor.getInt(0);
+                cursor.close();
+                return count == 0;
+            }
+            if (cursor != null) {
+                cursor.close();
+            }
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking if tables are empty: " + e.getMessage());
+            return true; // Assume empty if there's an error
+        }
+    }
+
+    private void verifyTablesExist(SQLiteDatabase db) {
+        try {
+            String[] tables = {
+                TABLE_INVENTORY,
+                TABLE_ORDERS,
+                TABLE_ORDER_ITEMS,
+                TABLE_USERS,
+                TABLE_DELIVERY,
+                TABLE_DELETED_NOTIFICATIONS,
+                TABLE_READ_NOTIFICATIONS,
+                TABLE_PRODUCT_PRICES
+            };
+
+            db.beginTransaction();
+            try {
+                for (String table : tables) {
+                    // Check if table exists
+                    Cursor cursor = db.rawQuery(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                        new String[]{table}
+                    );
+                    
+                    boolean exists = cursor != null && cursor.moveToFirst();
+                    if (cursor != null) {
+                        cursor.close();
+                    }
+                    
+                    if (!exists) {
+                        Log.e(TAG, "Required table does not exist: " + table);
+                        // Create the missing table
+                        createTable(db, table);
+                    } else {
+                        // Verify table schema
+                        verifyTableSchema(db, table);
+                    }
+                }
+                db.setTransactionSuccessful();
+                Log.d(TAG, "All required tables verified and created if needed");
+            } finally {
+                if (db.inTransaction()) {
+                    db.endTransaction();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error verifying tables: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to verify database tables: " + e.getMessage());
+        }
+    }
+
+    private void createTable(SQLiteDatabase db, String tableName) {
+        switch (tableName) {
+            case TABLE_INVENTORY:
+                createInventoryTable(db);
+                break;
+            case TABLE_ORDERS:
+                createOrdersTable(db);
+                break;
+            case TABLE_ORDER_ITEMS:
+                createOrderItemsTable(db);
+                break;
+            case TABLE_USERS:
+                createUsersTable(db);
+                break;
+            case TABLE_DELIVERY:
+                createDeliveryTable(db);
+                break;
+            case TABLE_DELETED_NOTIFICATIONS:
+                createDeletedNotificationsTable(db);
+                break;
+            case TABLE_READ_NOTIFICATIONS:
+                createReadNotificationsTable(db);
+                break;
+            case TABLE_PRODUCT_PRICES:
+                createProductPricesTable(db);
+                break;
+            default:
+                throw new RuntimeException("Unknown table: " + tableName);
+        }
+    }
+
+    private void verifyTableSchema(SQLiteDatabase db, String tableName) {
+        try {
+            Cursor cursor = db.rawQuery("PRAGMA table_info(" + tableName + ")", null);
+            if (cursor == null) {
+                throw new RuntimeException("Failed to get table info for: " + tableName);
+            }
+
+            // Get expected columns for the table
+            Map<String, String> expectedColumns = getExpectedColumns(tableName);
+            Set<String> foundColumns = new HashSet<>();
+
+            while (cursor.moveToNext()) {
+                String columnName = cursor.getString(cursor.getColumnIndex("name"));
+                foundColumns.add(columnName);
+            }
+            cursor.close();
+
+            // Check if all expected columns exist
+            for (String expectedColumn : expectedColumns.keySet()) {
+                if (!foundColumns.contains(expectedColumn)) {
+                    Log.e(TAG, "Missing column " + expectedColumn + " in table " + tableName);
+                    // Add the missing column
+                    String columnDef = expectedColumns.get(expectedColumn);
+                    db.execSQL("ALTER TABLE " + tableName + " ADD COLUMN " + expectedColumn + " " + columnDef);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error verifying table schema for " + tableName + ": " + e.getMessage());
+            throw new RuntimeException("Failed to verify table schema: " + e.getMessage());
+        }
+    }
+
+    private Map<String, String> getExpectedColumns(String tableName) {
+        Map<String, String> columns = new HashMap<>();
+        switch (tableName) {
+            case TABLE_INVENTORY:
+                columns.put(COLUMN_ID, "INTEGER PRIMARY KEY AUTOINCREMENT");
+                columns.put(COLUMN_NAME, "TEXT NOT NULL");
+                columns.put(COLUMN_CATEGORY, "TEXT NOT NULL");
+                columns.put(COLUMN_QTY, "INTEGER DEFAULT 0");
+                columns.put(COLUMN_PRICE, "FLOAT NOT NULL");
+                columns.put(COLUMN_MIN_THRESHOLD, "INTEGER DEFAULT 10");
+                break;
+            case TABLE_PRODUCT_PRICES:
+                columns.put(COLUMN_NAME, "TEXT");
+                columns.put(COLUMN_CATEGORY, "TEXT");
+                columns.put(COLUMN_PRICE, "REAL");
+                break;
+            // Add other tables as needed
+        }
+        return columns;
+    }
+
+    private void createInventoryTable(SQLiteDatabase db) {
+        String query = "CREATE TABLE " + TABLE_INVENTORY + "(" +
+                COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_NAME + " TEXT NOT NULL, " +
+                COLUMN_CATEGORY + " TEXT NOT NULL, " +
+                COLUMN_QTY + " INTEGER DEFAULT 0, " +
+                COLUMN_PRICE + " FLOAT NOT NULL, " +
+                COLUMN_MIN_THRESHOLD + " INTEGER DEFAULT 10);";
+        db.execSQL(query);
+        Log.d(TAG, "Inventory table created");
+    }
+
+    private void createOrdersTable(SQLiteDatabase db) {
+        String query = "CREATE TABLE " + TABLE_ORDERS + "(" +
+                COLUMN_ORDER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_ORDER_DATE + " TEXT NOT NULL, " +
+                COLUMN_ORDER_TIME + " TEXT NOT NULL, " +
+                COLUMN_ORDER_TOTAL + " FLOAT NOT NULL, " +
+                COLUMN_ORDER_STATUS + " TEXT DEFAULT 'Completed');";
+        db.execSQL(query);
+        Log.d(TAG, "Orders table created");
+    }
+
+    private void createOrderItemsTable(SQLiteDatabase db) {
+        String query = "CREATE TABLE " + TABLE_ORDER_ITEMS + "(" +
+                COLUMN_ORDER_ITEM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_ORDER_ID_FK + " INTEGER NOT NULL, " +
+                COLUMN_ORDER_PRODUCT_ID + " INTEGER NOT NULL, " +
+                COLUMN_ORDER_QUANTITY + " INTEGER NOT NULL, " +
+                COLUMN_ORDER_ITEM_PRICE + " FLOAT NOT NULL, " +
+                COLUMN_ORDER_ITEM_TOTAL + " FLOAT NOT NULL, " +
+                "FOREIGN KEY(" + COLUMN_ORDER_ID_FK + ") REFERENCES " + TABLE_ORDERS + "(" + COLUMN_ORDER_ID + "), " +
+                "FOREIGN KEY(" + COLUMN_ORDER_PRODUCT_ID + ") REFERENCES " + TABLE_INVENTORY + "(" + COLUMN_ID + "));";
+        db.execSQL(query);
+        Log.d(TAG, "Order items table created");
+    }
+
+    private void createUsersTable(SQLiteDatabase db) {
+        String query = "CREATE TABLE " + TABLE_USERS + " (" +
+                COLUMN_USER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_FULLNAME + " TEXT NOT NULL, " +
+                COLUMN_EMAIL + " TEXT UNIQUE NOT NULL, " +
+                COLUMN_PASSWORD + " TEXT NOT NULL)";
+        db.execSQL(query);
+        Log.d(TAG, "Users table created");
+    }
+
+    private void createDeliveryTable(SQLiteDatabase db) {
+        String query = "CREATE TABLE " + TABLE_DELIVERY + " (" +
+                COLUMN_DELIVERY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_ORDER + " TEXT, " +
+                COLUMN_DATE + " TEXT, " +
+                COLUMN_TIME + " TEXT, " +
+                COLUMN_STATUS + " TEXT, " +
+                COLUMN_LOCATION + " TEXT" +
+                ")";
+        db.execSQL(query);
+        Log.d(TAG, "Delivery table created");
+    }
+
+    private void createDeletedNotificationsTable(SQLiteDatabase db) {
+        String query = "CREATE TABLE " + TABLE_DELETED_NOTIFICATIONS + " (" +
+                COLUMN_NOTIFICATION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                COLUMN_DELIVERY_ID + " TEXT NOT NULL," +
+                COLUMN_DELETED_AT + " INTEGER NOT NULL)";
+        db.execSQL(query);
+        Log.d(TAG, "Deleted notifications table created");
+    }
+
+    private void createReadNotificationsTable(SQLiteDatabase db) {
+        String query = "CREATE TABLE " + TABLE_READ_NOTIFICATIONS + " (" +
+                COLUMN_NOTIFICATION_ID + " TEXT PRIMARY KEY," +
+                COLUMN_READ_AT + " INTEGER NOT NULL)";
+        db.execSQL(query);
+        Log.d(TAG, "Read notifications table created");
+    }
+
+    private void createProductPricesTable(SQLiteDatabase db) {
+        String query = "CREATE TABLE " + TABLE_PRODUCT_PRICES + " (" +
+                COLUMN_NAME + " TEXT, " +
+                COLUMN_CATEGORY + " TEXT, " +
+                COLUMN_PRICE + " REAL, " +
+                "PRIMARY KEY (" + COLUMN_NAME + ", " + COLUMN_CATEGORY + "))";
+        db.execSQL(query);
+        Log.d(TAG, "Product prices table created");
     }
 
     @Override
     public void onCreate(SQLiteDatabase db) {
         try {
-            String inventoryQuery = "CREATE TABLE " + TABLE_INVENTORY + "(" + COLUMN_ID +
-                    " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    COLUMN_NAME + " TEXT NOT NULL, " +
-                    COLUMN_CATEGORY + " TEXT NOT NULL, " +
-                    COLUMN_QTY + " INTEGER DEFAULT 0, " +
-                    COLUMN_PRICE + " FLOAT NOT NULL, " +
-                    COLUMN_MIN_THRESHOLD + " INTEGER DEFAULT 10);";
-            db.execSQL(inventoryQuery);
-            Log.d(TAG, "Inventory table created successfully");
-
-            String ordersQuery = "CREATE TABLE " + TABLE_ORDERS + "(" +
-                    COLUMN_ORDER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    COLUMN_ORDER_DATE + " TEXT NOT NULL, " +
-                    COLUMN_ORDER_TIME + " TEXT NOT NULL, " +
-                    COLUMN_ORDER_TOTAL + " FLOAT NOT NULL, " +
-                    COLUMN_ORDER_STATUS + " TEXT DEFAULT 'Completed');";
-            db.execSQL(ordersQuery);
-            Log.d(TAG, "Orders table created successfully");
-
-            String orderItemsQuery = "CREATE TABLE " + TABLE_ORDER_ITEMS + "(" +
-                    COLUMN_ORDER_ITEM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    COLUMN_ORDER_ID_FK + " INTEGER NOT NULL, " +
-                    COLUMN_ORDER_PRODUCT_ID + " INTEGER NOT NULL, " +
-                    COLUMN_ORDER_QUANTITY + " INTEGER NOT NULL, " +
-                    COLUMN_ORDER_ITEM_PRICE + " FLOAT NOT NULL, " +
-                    COLUMN_ORDER_ITEM_TOTAL + " FLOAT NOT NULL, " +
-                    "FOREIGN KEY(" + COLUMN_ORDER_ID_FK + ") REFERENCES " + TABLE_ORDERS + "(" + COLUMN_ORDER_ID + "), " +
-                    "FOREIGN KEY(" + COLUMN_ORDER_PRODUCT_ID + ") REFERENCES " + TABLE_INVENTORY + "(" + COLUMN_ID + "));";
-            db.execSQL(orderItemsQuery);
-            Log.d(TAG, "Order items table created successfully");
-
-            String usersQuery = "CREATE TABLE " + TABLE_USERS + " (" +
-                    COLUMN_USER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    COLUMN_FULLNAME + " TEXT NOT NULL, " +
-                    COLUMN_EMAIL + " TEXT UNIQUE NOT NULL, " +
-                    COLUMN_PASSWORD + " TEXT NOT NULL)";
-            db.execSQL(usersQuery);
-            Log.d(TAG, "Users table created successfully");
-
-            String createDeliveryTable = "CREATE TABLE " + TABLE_DELIVERY + " (" +
-                    COLUMN_DELIVERY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    COLUMN_ORDER + " TEXT, " +
-                    COLUMN_DATE + " TEXT, " +
-                    COLUMN_TIME + " TEXT, " +
-                    COLUMN_STATUS + " TEXT, " +
-                    COLUMN_LOCATION + " TEXT" +
-                    ")";
-            db.execSQL(createDeliveryTable);
-            Log.d(TAG, "Delivery table created successfully");
-
-            String createDeletedNotificationsTable = "CREATE TABLE " + TABLE_DELETED_NOTIFICATIONS + " (" +
-                    COLUMN_NOTIFICATION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    COLUMN_DELIVERY_ID + " TEXT NOT NULL," +
-                    COLUMN_DELETED_AT + " INTEGER NOT NULL)";
-            db.execSQL(createDeletedNotificationsTable);
-            Log.d(TAG, "Deleted notifications table created successfully");
-
-            String createReadNotificationsTable = "CREATE TABLE " + TABLE_READ_NOTIFICATIONS + " (" +
-                    COLUMN_NOTIFICATION_ID + " TEXT PRIMARY KEY," +
-                    COLUMN_READ_AT + " INTEGER NOT NULL)";
-            db.execSQL(createReadNotificationsTable);
-            Log.d(TAG, "Read notifications table created successfully");
-
-            Log.d(TAG, "All database tables created successfully");
+            db.beginTransaction();
+            
+            // Create all tables
+            createInventoryTable(db);
+            createOrdersTable(db);
+            createOrderItemsTable(db);
+            createUsersTable(db);
+            createDeliveryTable(db);
+            createDeletedNotificationsTable(db);
+            createReadNotificationsTable(db);
+            createProductPricesTable(db);
+            
+            // Insert initial data
+            insertInitialPrices(db);
+            
+            db.setTransactionSuccessful();
+            Log.d(TAG, "Database created successfully");
         } catch (Exception e) {
-            Log.e(TAG, "Error creating database tables: " + e.getMessage());
-            throw new RuntimeException("Failed to create database tables", e);
+            Log.e(TAG, "Error creating database: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to create database: " + e.getMessage());
+        } finally {
+            if (db.inTransaction()) {
+                db.endTransaction();
+            }
         }
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         try {
-            Log.d(TAG, "Upgrading database from version " + oldVersion + " to " + newVersion);
-
-            if (oldVersion < 2) {
-                db.execSQL("ALTER TABLE " + TABLE_INVENTORY + " ADD COLUMN " + COLUMN_CATEGORY + " TEXT");
-                Log.d(TAG, "Added category column to inventory table");
+            db.beginTransaction();
+            
+            if (oldVersion < 8) {
+                // Drop and recreate product_prices table
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_PRODUCT_PRICES);
+                createProductPricesTable(db);
+                insertInitialPrices(db);
+                Log.d(TAG, "Upgraded product_prices table");
             }
-
-            if (oldVersion < 3) {
-                db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELIVERY);
-                String deliveryQuery = "CREATE TABLE " + TABLE_DELIVERY + "(" +
-                        COLUMN_DELIVERY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-                        COLUMN_ORDER + " TEXT NOT NULL," +
-                        COLUMN_DATE + " TEXT NOT NULL," +
-                        COLUMN_TIME + " TEXT NOT NULL," +
-                        COLUMN_STATUS + " TEXT DEFAULT 'Pending')";
-                db.execSQL(deliveryQuery);
-                Log.d(TAG, "Recreated delivery table with status column");
-            }
-
-            if (oldVersion < 4) {
-                String createDeletedNotificationsTable = "CREATE TABLE " + TABLE_DELETED_NOTIFICATIONS + " (" +
-                        COLUMN_NOTIFICATION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-                        COLUMN_DELIVERY_ID + " TEXT NOT NULL," +
-                        COLUMN_DELETED_AT + " INTEGER NOT NULL)";
-                db.execSQL(createDeletedNotificationsTable);
-                Log.d(TAG, "Created deleted notifications table");
-            }
-
-            if (oldVersion < 7) {
-                db.execSQL("ALTER TABLE " + TABLE_DELIVERY + " ADD COLUMN " + COLUMN_LOCATION + " TEXT");
-                Log.d(TAG, "Added location column to delivery table");
-            }
+            
+            db.setTransactionSuccessful();
+            Log.d(TAG, "Database upgrade completed successfully");
         } catch (Exception e) {
-            Log.e(TAG, "Error upgrading database: " + e.getMessage());
-            throw new RuntimeException("Failed to upgrade database", e);
+            Log.e(TAG, "Error upgrading database: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to upgrade database: " + e.getMessage());
+        } finally {
+            if (db.inTransaction()) {
+                db.endTransaction();
+            }
         }
     }
 
     @Override
     public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         try {
+            Log.d(TAG, "Handling database downgrade from version " + oldVersion + " to " + newVersion);
+            // For safety, we'll recreate the database
             db.execSQL("DROP TABLE IF EXISTS " + TABLE_INVENTORY);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_ORDERS);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_ORDER_ITEMS);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_USERS);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELIVERY);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELETED_NOTIFICATIONS);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_READ_NOTIFICATIONS);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_PRODUCT_PRICES);
             onCreate(db);
-            Log.d(TAG, "Handled database downgrade");
+            Log.d(TAG, "Database downgrade completed successfully");
         } catch (Exception e) {
-            Log.e(TAG, "Error downgrading database: " + e.getMessage());
+            Log.e(TAG, "Error downgrading database: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to downgrade database: " + e.getMessage());
+        }
+    }
+
+    private void insertInitialPrices(SQLiteDatabase db) {
+        db.beginTransaction();
+        try {
+            ContentValues cv = new ContentValues();
+            for (Map.Entry<String, Float> entry : PRODUCT_PRICES.entrySet()) {
+                String[] parts = entry.getKey().split(" - ", 2);
+                if (parts.length == 2) {
+                    cv.clear();
+                    cv.put(COLUMN_CATEGORY, parts[0]);
+                    cv.put(COLUMN_NAME, parts[1]);
+                    cv.put(COLUMN_PRICE, entry.getValue());
+                    db.insertWithOnConflict(TABLE_PRODUCT_PRICES, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+                }
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
         }
     }
 
@@ -283,40 +542,105 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         PRODUCT_THRESHOLDS.put("Beefies Products - Beefies w/ Cheese 1 kilo", 10);
     }
 
-    void addInventory(String name, String category, int qty) {
+    public float getProductPrice(String productKey) {
         SQLiteDatabase db = null;
+        Cursor cursor = null;
+        try {
+            db = this.getReadableDatabase();
+            String[] parts = productKey.split(" - ", 2);
+            if (parts.length != 2) {
+                return 0.0f;
+            }
+            
+            cursor = db.query(TABLE_PRODUCT_PRICES,
+                    new String[]{COLUMN_PRICE},
+                    COLUMN_CATEGORY + " = ? AND " + COLUMN_NAME + " = ?",
+                    new String[]{parts[0], parts[1]},
+                    null, null, null);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursor.getFloat(0);
+            }
+            return 0.0f;
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting product price: " + e.getMessage());
+            return 0.0f;
+        } finally {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+        }
+    }
+
+    public boolean addInventory(String name, String category, int qty) {
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
         try {
             db = this.getWritableDatabase();
-            ContentValues cv = new ContentValues();
+            if (db == null) {
+                Log.e(TAG, "Failed to get writable database");
+                return false;
+            }
+
+            db.beginTransaction();
 
             String productKey = category + " - " + name;
-            float price = PRODUCT_PRICES.getOrDefault(productKey, 100.00f);
+            float price = getProductPrice(productKey);
             int min_threshold = PRODUCT_THRESHOLDS.getOrDefault(productKey, 10);
 
-            if (isProductExists(name, category)) {
-                String updateQuery = "UPDATE " + TABLE_INVENTORY + " SET " + COLUMN_QTY + " = " + COLUMN_QTY + " + ? WHERE " + COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ?";
-                db.execSQL(updateQuery, new Object[]{qty, name, category});
-                Toast.makeText(context, "Quantity updated successfully!", Toast.LENGTH_SHORT).show();
-            } else {
-                cv.put(COLUMN_NAME, name);
-                cv.put(COLUMN_CATEGORY, category);
-                cv.put(COLUMN_QTY, qty);
-                cv.put(COLUMN_PRICE, price);
-                cv.put(COLUMN_MIN_THRESHOLD, min_threshold);
+            // Check if product exists with the same name, category AND price
+            cursor = db.query(TABLE_INVENTORY,
+                    new String[]{COLUMN_ID, COLUMN_QTY},
+                    COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ? AND " + COLUMN_PRICE + " = ?",
+                    new String[]{name, category, String.valueOf(price)},
+                    null, null, null);
 
+            ContentValues cv = new ContentValues();
+            cv.put(COLUMN_NAME, name);
+            cv.put(COLUMN_CATEGORY, category);
+            cv.put(COLUMN_PRICE, price);
+            cv.put(COLUMN_MIN_THRESHOLD, min_threshold);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                // Product exists with same price, update quantity
+                int currentQty = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_QTY));
+                cv.put(COLUMN_QTY, currentQty + qty);
+                
+                int rowsAffected = db.update(TABLE_INVENTORY, cv,
+                        COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ? AND " + COLUMN_PRICE + " = ?",
+                        new String[]{name, category, String.valueOf(price)});
+                
+                if (rowsAffected > 0) {
+                    db.setTransactionSuccessful();
+                    return true;
+                }
+            } else {
+                // Product doesn't exist with this price, insert new
+                cv.put(COLUMN_QTY, qty);
                 long result = db.insert(TABLE_INVENTORY, null, cv);
-                if (result == -1) {
-                    Toast.makeText(context, "Failed to add inventory", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(context, "Added Successfully!", Toast.LENGTH_SHORT).show();
+                if (result != -1) {
+                    db.setTransactionSuccessful();
+                    return true;
                 }
             }
+
+            return false;
         } catch (Exception e) {
-            Log.e(TAG, "Error in addInventory: " + e.getMessage());
-            Toast.makeText(context, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error in addInventory: " + e.getMessage(), e);
+            return false;
         } finally {
-            if (db != null && db.isOpen()) {
-                db.close();
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            if (db != null) {
+                if (db.inTransaction()) {
+                    db.endTransaction();
+                }
+                try {
+                    db.close();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error closing database: " + e.getMessage());
+                }
             }
         }
     }
@@ -571,7 +895,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             if (cursor != null) {
                 cursor.close();
             }
-            if (db != null) {
+            if (db != null && db.isOpen()) {
                 db.close();
             }
         }
@@ -1117,6 +1441,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return dateFormat.format(calendar.getTime());
     }
 
+    // Used by EditPricesActivity to update product prices
     public boolean updateProductPrice(String productId, float newPrice) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
@@ -1136,6 +1461,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    // Used by EditPricesActivity to fetch all products
     public List<Product> getAllProducts() {
         List<Product> products = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
@@ -1166,69 +1492,137 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return products;
     }
 
-    public float getProductPrice(String fullProductName) {
-        // First try to get from database
-        SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = null;
-        try {
-            String[] parts = fullProductName.split(" - ", 2);
-            if (parts.length == 2) {
-                String category = parts[0];
-                String name = parts[1];
-                cursor = db.query(TABLE_INVENTORY,
-                        new String[]{COLUMN_PRICE},
-                        COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ?",
-                        new String[]{name, category},
-                        null, null, null);
-                
-                if (cursor != null && cursor.moveToFirst()) {
-                    return cursor.getFloat(0);
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting product price from database: " + e.getMessage());
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-            if (db != null && db.isOpen()) {
-                db.close();
-            }
-        }
-        // Fallback to predefined price if not found in database
-        return PRODUCT_PRICES.getOrDefault(fullProductName, 0.0f);
-    }
-
     public boolean updatePredefinedPrice(String fullProductName, float newPrice) {
+        if (fullProductName == null || fullProductName.isEmpty()) {
+            Log.e(TAG, "Invalid product name: null or empty");
+            return false;
+        }
+
+        if (newPrice <= 0) {
+            Log.e(TAG, "Invalid price: must be greater than zero");
+            return false;
+        }
+
+        String[] parts = fullProductName.split(" - ", 2);
+        if (parts.length != 2) {
+            Log.e(TAG, "Invalid product name format: " + fullProductName);
+            return false;
+        }
+
+        String category = parts[0].trim();
+        String name = parts[1].trim();
+        
+        if (category.isEmpty() || name.isEmpty()) {
+            Log.e(TAG, "Invalid category or name: empty after trim");
+            return false;
+        }
+
+        Log.d(TAG, "Attempting to update price for: " + fullProductName + " to " + newPrice);
+        Log.d(TAG, "Category: " + category + ", Name: " + name);
+
         SQLiteDatabase db = null;
         try {
-            String[] parts = fullProductName.split(" - ", 2);
-            if (parts.length != 2) {
+            db = this.getWritableDatabase();
+            if (db == null) {
+                Log.e(TAG, "Failed to get writable database");
                 return false;
             }
 
-            String category = parts[0];
-            String name = parts[1];
+            db.beginTransaction();
             
-            db = this.getWritableDatabase();
-            ContentValues values = new ContentValues();
-            values.put(COLUMN_PRICE, newPrice);
+            try {
+                ContentValues priceValues = new ContentValues();
+                priceValues.put(COLUMN_NAME, name);
+                priceValues.put(COLUMN_CATEGORY, category);
+                priceValues.put(COLUMN_PRICE, newPrice);
+                
+                // Use insert with conflict resolution to handle both insert and update cases
+                long result = db.insertWithOnConflict(TABLE_PRODUCT_PRICES, null, priceValues, 
+                    SQLiteDatabase.CONFLICT_REPLACE);
+                
+                if (result == -1) {
+                    Log.e(TAG, "Failed to update price in product_prices table");
+                    return false;
+                }
 
-            // Update the database
-            int rowsAffected = db.update(TABLE_INVENTORY,
+                // Update the in-memory map
+                synchronized (PRODUCT_PRICES) {
+                    PRODUCT_PRICES.put(fullProductName, newPrice);
+                }
+
+                db.setTransactionSuccessful();
+                Log.d(TAG, "Successfully updated price for " + fullProductName + " to " + newPrice);
+                return true;
+            } catch (Exception e) {
+                Log.e(TAG, "Error during price update transaction: " + e.getMessage(), e);
+                return false;
+            } finally {
+                if (db != null && db.inTransaction()) {
+                    db.endTransaction();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating product price: " + e.getMessage(), e);
+            return false;
+        } finally {
+            if (db != null && db.isOpen()) {
+                try {
+                    db.close();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error closing database: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    private void syncProductPrices(String productName, String category, float newPrice) {
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            db.beginTransaction();
+            
+            try {
+                ContentValues values = new ContentValues();
+                values.put(COLUMN_PRICE, newPrice);
+
+                // Update prices in inventory table
+                db.update(TABLE_INVENTORY,
                     values,
                     COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ?",
-                    new String[]{name, category});
+                    new String[]{productName, category});
 
-            if (rowsAffected > 0) {
-                // Update the in-memory map
-                PRODUCT_PRICES.put(fullProductName, newPrice);
-                return true;
+                // Update prices in order items for recent orders (last 30 days)
+                String thirtyDaysAgo = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                    .format(new Date(System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000)));
+                
+                String updateOrderItemsQuery = 
+                    "UPDATE " + TABLE_ORDER_ITEMS + " oi " +
+                    "SET oi." + COLUMN_ORDER_ITEM_PRICE + " = ?, " +
+                    "oi." + COLUMN_ORDER_ITEM_TOTAL + " = oi." + COLUMN_ORDER_QUANTITY + " * ? " +
+                    "WHERE EXISTS (" +
+                    "   SELECT 1 FROM " + TABLE_INVENTORY + " i " +
+                    "   WHERE i." + COLUMN_ID + " = oi." + COLUMN_ORDER_PRODUCT_ID + " " +
+                    "   AND i." + COLUMN_NAME + " = ? " +
+                    "   AND i." + COLUMN_CATEGORY + " = ? " +
+                    ") AND EXISTS (" +
+                    "   SELECT 1 FROM " + TABLE_ORDERS + " o " +
+                    "   WHERE o." + COLUMN_ORDER_ID + " = oi." + COLUMN_ORDER_ID_FK + " " +
+                    "   AND date(o." + COLUMN_ORDER_DATE + ") >= date(?)" +
+                    ")";
+                
+                db.execSQL(updateOrderItemsQuery, 
+                    new Object[]{newPrice, newPrice, productName, category, thirtyDaysAgo});
+
+                db.setTransactionSuccessful();
+            } catch (Exception e) {
+                Log.e(TAG, "Error syncing product prices: " + e.getMessage());
+            } finally {
+                if (db != null && db.inTransaction()) {
+                    db.endTransaction();
+                }
             }
-            return false;
         } catch (Exception e) {
-            Log.e(TAG, "Error updating product price: " + e.getMessage());
-            return false;
+            Log.e(TAG, "Error in syncProductPrices: " + e.getMessage());
         } finally {
             if (db != null && db.isOpen()) {
                 db.close();
@@ -1357,6 +1751,45 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
         
         return items;
+    }
+
+    public boolean updateInventoryPrice(String productName, String category, double newPrice) {
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            db.beginTransaction();
+
+            // Update the price in the inventory table
+            ContentValues values = new ContentValues();
+            values.put(COLUMN_PRICE, newPrice);
+
+            String whereClause = "name = ? AND category = ?";
+            String[] whereArgs = {productName, category};
+
+            int rowsAffected = db.update(TABLE_INVENTORY, values, whereClause, whereArgs);
+
+            if (rowsAffected > 0) {
+                db.setTransactionSuccessful();
+                Log.d("MyDataBaseHelper", "Successfully updated inventory price for " + productName);
+                return true;
+            } else {
+                Log.w("MyDataBaseHelper", "No inventory items found to update for " + productName);
+                return false;
+            }
+        } catch (Exception e) {
+            Log.e("MyDataBaseHelper", "Error updating inventory price: " + e.getMessage());
+            return false;
+        } finally {
+            if (db != null) {
+                try {
+                    if (db.inTransaction()) {
+                        db.endTransaction();
+                    }
+                } catch (Exception e) {
+                    Log.e("MyDataBaseHelper", "Error ending transaction: " + e.getMessage());
+                }
+            }
+        }
     }
 }
 

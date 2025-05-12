@@ -2,7 +2,9 @@ package com.example.mamaabbys;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.ImageButton;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -13,39 +15,74 @@ public class SettingsActivity extends AppCompatActivity implements SettingsAdapt
     private RecyclerView settingsRecyclerView;
     private SettingsAdapter adapter;
     private List<SettingsItem> settingsItems;
+    private MyDataBaseHelper dbHelper;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_settings);
+        try {
+            setContentView(R.layout.activity_settings);
 
-        // Initialize views
-        ImageButton backButton = findViewById(R.id.backButton);
-        settingsRecyclerView = findViewById(R.id.settingsRecyclerView);
+            // Initialize database helper
+            dbHelper = new MyDataBaseHelper(this);
 
-        // Setup back button
-        backButton.setOnClickListener(v -> finish());
+            // Initialize views
+            ImageButton backButton = findViewById(R.id.backButton);
+            settingsRecyclerView = findViewById(R.id.settingsRecyclerView);
 
-        // Setup RecyclerView
-        settingsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        settingsItems = new ArrayList<>();
-        
-        // Add settings items
-        settingsItems.add(new SettingsItem("Account Settings", "Manage your account preferences"));
-        settingsItems.add(new SettingsItem("Notifications", "Configure notification settings"));
-        settingsItems.add(new SettingsItem("Appearance", "Customize app theme and display"));
-        settingsItems.add(new SettingsItem("Edit Prices", "Update product prices"));
-        settingsItems.add(new SettingsItem("About", "App information and version"));
+            // Setup back button with error handling
+            backButton.setOnClickListener(v -> {
+                try {
+                    finish();
+                } catch (Exception e) {
+                    Log.e("SettingsActivity", "Error finishing activity: " + e.getMessage());
+                    // Fallback to default back behavior
+                    onBackPressed();
+                }
+            });
 
-        adapter = new SettingsAdapter(settingsItems, this);
-        settingsRecyclerView.setAdapter(adapter);
+            // Setup RecyclerView
+            settingsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+            settingsItems = new ArrayList<>();
+            
+            // Add settings items
+            settingsItems.add(new SettingsItem("Account Settings", "Manage your account preferences"));
+            settingsItems.add(new SettingsItem("Notifications", "Configure notification settings"));
+            settingsItems.add(new SettingsItem("Edit Prices", "View and update product prices"));
+
+            adapter = new SettingsAdapter(settingsItems, this);
+            settingsRecyclerView.setAdapter(adapter);
+        } catch (Exception e) {
+            Log.e("SettingsActivity", "Error in onCreate: " + e.getMessage());
+            Toast.makeText(this, "Error initializing settings", Toast.LENGTH_SHORT).show();
+            finish();
+        }
     }
 
     @Override
     public void onSettingsItemClick(SettingsItem item) {
-        if (item.getTitle().equals("Edit Prices")) {
-            Intent intent = new Intent(this, EditPricesActivity.class);
-            startActivity(intent);
+        try {
+            if (item.getTitle().equals("Edit Prices")) {
+                Intent intent = new Intent(SettingsActivity.this, EditPricesActivity.class);
+                startActivity(intent);
+                return;
+            }
+            // Handle other settings items if needed
+        } catch (Exception e) {
+            Log.e("SettingsActivity", "Error handling settings item click: " + e.getMessage());
+            Toast.makeText(this, "Error opening settings option", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try {
+            if (dbHelper != null) {
+                dbHelper.close();
+            }
+        } catch (Exception e) {
+            Log.e("SettingsActivity", "Error closing database: " + e.getMessage());
         }
     }
 } 

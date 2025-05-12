@@ -55,7 +55,9 @@
             android:exported="false" />
         <activity
             android:name=".EditPricesActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:label="Edit Prices"
+            android:parentActivityName=".SettingsActivity" />
     </application>
 
 </manifest>
