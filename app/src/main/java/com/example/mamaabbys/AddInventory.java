@@ -20,6 +20,7 @@ public class AddInventory extends AppCompatActivity {
     private MyDataBaseHelper myDB;
     private String selectedCategory, selectedProduct;
     private android.os.Handler mainHandler;
+    private SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,8 +30,9 @@ public class AddInventory extends AppCompatActivity {
         // Initialize handler for main thread
         mainHandler = new android.os.Handler(getMainLooper());
 
-        // Initialize database helper
+        // Initialize database helper and session manager
         myDB = new MyDataBaseHelper(this);
+        sessionManager = new SessionManager(this);
 
         // Initialize views
         categorySpinner = findViewById(R.id.categorySpinner);
@@ -121,6 +123,14 @@ public class AddInventory extends AppCompatActivity {
                 return;
             }
 
+            // Get current user ID
+            int userId = sessionManager.getUserId();
+            if (userId == -1) {
+                showToast("User session expired. Please login again.");
+                finish();
+                return;
+            }
+
             // Disable save button to prevent multiple clicks
             saveButton.setEnabled(false);
 
@@ -130,7 +140,7 @@ public class AddInventory extends AppCompatActivity {
                     Log.d("AddInventory", "Attempting to add inventory item: " + selectedProduct + 
                         " in category: " + selectedCategory + " with quantity: " + quantity);
                     
-                    boolean success = myDB.addInventory(selectedProduct, selectedCategory, quantity);
+                    boolean success = myDB.addInventory(selectedProduct, selectedCategory, quantity, userId);
                     
                     runOnUiThread(() -> {
                         if (success) {

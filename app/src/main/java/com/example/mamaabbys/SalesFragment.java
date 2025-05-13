@@ -5,6 +5,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -36,11 +37,13 @@ public class SalesFragment extends Fragment implements OrderAdapter.OnOrderClick
     private Chip weeklyChip;
     private Chip monthlyChip;
     private String currentFilter = "today"; // Default filter
+    private SessionManager sessionManager;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         dbHelper = new MyDataBaseHelper(requireContext());
+        sessionManager = new SessionManager(requireContext());
     }
 
     @Nullable
@@ -93,26 +96,32 @@ public class SalesFragment extends Fragment implements OrderAdapter.OnOrderClick
     }
 
     private void loadData() {
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            Toast.makeText(requireContext(), "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         new Thread(() -> {
             try {
                 List<Order> filteredOrders;
-                double todayRevenue = dbHelper.getTodayRevenue();
-                double weeklyRevenue = dbHelper.getWeeklyRevenue();
-                double monthlyRevenue = dbHelper.getMonthlyRevenue();
+                double todayRevenue = dbHelper.getTodayRevenue(userId);
+                double weeklyRevenue = dbHelper.getWeeklyRevenue(userId);
+                double monthlyRevenue = dbHelper.getMonthlyRevenue(userId);
                 
                 // Get filtered orders based on selected chip
                 switch (currentFilter) {
                     case "today":
-                        filteredOrders = dbHelper.getOrdersByDate(getTodayDate());
+                        filteredOrders = dbHelper.getOrdersByDate(getTodayDate(), userId);
                         break;
                     case "weekly":
-                        filteredOrders = dbHelper.getOrdersByDateRange(getWeekStartDate(), getTodayDate());
+                        filteredOrders = dbHelper.getOrdersByDateRange(getWeekStartDate(), getTodayDate(), userId);
                         break;
                     case "monthly":
-                        filteredOrders = dbHelper.getOrdersByDateRange(getMonthStartDate(), getTodayDate());
+                        filteredOrders = dbHelper.getOrdersByDateRange(getMonthStartDate(), getTodayDate(), userId);
                         break;
                     default:
-                        filteredOrders = dbHelper.getAllOrders();
+                        filteredOrders = dbHelper.getAllOrders(userId);
                 }
                 
                 requireActivity().runOnUiThread(() -> {

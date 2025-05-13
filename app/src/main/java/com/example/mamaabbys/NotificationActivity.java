@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import android.widget.ImageButton;
+import android.widget.Toast;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -22,6 +23,7 @@ public class NotificationActivity extends AppCompatActivity implements
     private RecyclerView recyclerView;
     private NotificationAdapter adapter;
     private List<NotificationItem> notificationItems;
+    private SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,6 +32,7 @@ public class NotificationActivity extends AppCompatActivity implements
 
         myDB = new MyDataBaseHelper(this);
         notificationItems = new ArrayList<>();
+        sessionManager = new SessionManager(this);
 
         // Setup back button
         ImageButton backButton = findViewById(R.id.backButton);
@@ -42,53 +45,57 @@ public class NotificationActivity extends AppCompatActivity implements
         recyclerView.setAdapter(adapter);
 
         // Load and check deliveries
-        checkAndNotifyDeliveries(myDB.getAllDeliveries());
+        loadNotifications();
     }
 
-    private void checkAndNotifyDeliveries(List<Delivery> deliveries) {
+    private void loadNotifications() {
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<Delivery> deliveries = myDB.getAllDeliveries(userId);
         notificationItems.clear();
+
         for (Delivery delivery : deliveries) {
-            try {
-                // Skip if notification was previously deleted
-                if (myDB.isNotificationDeleted(delivery.getId())) {
-                    continue;
-                }
+            // Skip if notification was previously deleted
+            if (myDB.isNotificationDeleted(delivery.getId(), userId)) {
+                continue;
+            }
 
-                long daysLeft = calculateDaysLeft(delivery);
-                String notificationTitle = "";
-                String notificationMessage = "";
-                String orderDetails = "Order: " + delivery.getOrderDescription() + "\nLocation: " + delivery.getLocation();
+            long daysLeft = calculateDaysLeft(delivery);
+            String notificationTitle = "";
+            String notificationMessage = "";
+            String orderDetails = "Order: " + delivery.getOrderDescription() + "\nLocation: " + delivery.getLocation();
 
-                if (daysLeft == 7) {
-                    notificationTitle = "Delivery in 7 days";
-                    notificationMessage = "Your order is scheduled for delivery in 7 days on " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
-                } else if (daysLeft == 3) {
-                    notificationTitle = "Delivery in 3 days";
-                    notificationMessage = "Your order is scheduled for delivery in 3 days on " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
-                } else if (daysLeft == 0) {
-                    notificationTitle = "Delivery today!";
-                    notificationMessage = "Your order is scheduled for delivery today at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
-                }
+            if (daysLeft == 7) {
+                notificationTitle = "Delivery in 7 days";
+                notificationMessage = "Your order is scheduled for delivery in 7 days on " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
+            } else if (daysLeft == 3) {
+                notificationTitle = "Delivery in 3 days";
+                notificationMessage = "Your order is scheduled for delivery in 3 days on " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
+            } else if (daysLeft == 0) {
+                notificationTitle = "Delivery today!";
+                notificationMessage = "Your order is scheduled for delivery today at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
+            }
 
-                if (!notificationTitle.isEmpty() && !notificationMessage.isEmpty()) {
-                    boolean isRead = myDB.isNotificationRead(delivery.getId());
-                    NotificationItem notificationItem = new NotificationItem(
-                        delivery.getId(),
-                        notificationTitle,
-                        notificationMessage,
-                        delivery.getDeliveryDate(),
-                        delivery.getDeliveryTime(),
-                        orderDetails,
-                        true // This is a delivery notification
-                    );
-                    notificationItem.setRead(isRead);
-                    notificationItems.add(notificationItem);
-                    
-                    // Show system notification
-                    NotificationHelper.showNotification(this, notificationTitle, notificationMessage);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+            if (!notificationTitle.isEmpty() && !notificationMessage.isEmpty()) {
+                boolean isRead = myDB.isNotificationRead(delivery.getId(), userId);
+                NotificationItem notificationItem = new NotificationItem(
+                    delivery.getId(),
+                    notificationTitle,
+                    notificationMessage,
+                    delivery.getDeliveryDate(),
+                    delivery.getDeliveryTime(),
+                    orderDetails,
+                    true // This is a delivery notification
+                );
+                notificationItem.setRead(isRead);
+                notificationItems.add(notificationItem);
+                
+                // Show system notification
+                NotificationHelper.showNotification(this, notificationTitle, notificationMessage);
             }
         }
 
@@ -139,32 +146,47 @@ public class NotificationActivity extends AppCompatActivity implements
 
     @Override
     public void onDeleteNotification(NotificationItem notification) {
-        // Mark notification as deleted in database
-        if (myDB.markNotificationAsDeleted(notification.getId())) {
-            // Remove from current list
-            notificationItems.remove(notification);
-            adapter.updateNotifications(notificationItems);
-        }
+        deleteNotification(notification);
     }
 
     @Override
     public void onMarkAsRead(NotificationItem notification) {
-        // Mark notification as read in database
-        if (myDB.markNotificationAsRead(notification.getId())) {
-            // Update local state
-            notification.setRead(true);
-            // Re-sort the list
-            notificationItems.sort((a, b) -> {
-                if (a.isRead() == b.isRead()) {
-                    return Long.compare(b.getTimestamp(), a.getTimestamp());
-                }
-                return Boolean.compare(a.isRead(), b.isRead());
-            });
+        markAsRead(notification);
+    }
+
+    private void deleteNotification(NotificationItem notification) {
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (myDB.markNotificationAsDeleted(notification.getId(), userId)) {
+            notificationItems.remove(notification);
             adapter.updateNotifications(notificationItems);
+            Toast.makeText(this, "Notification deleted", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "Failed to delete notification", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void markAsRead(NotificationItem notification) {
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (myDB.markNotificationAsRead(notification.getId(), userId)) {
+            notification.setRead(true);
+            adapter.updateNotifications(notificationItems);
+            Toast.makeText(this, "Marked as read", Toast.LENGTH_SHORT).show();
             
             // Broadcast that a notification was marked as read
             Intent intent = new Intent("com.example.mamaabbys.NOTIFICATION_READ");
             sendBroadcast(intent);
+        } else {
+            Toast.makeText(this, "Failed to mark as read", Toast.LENGTH_SHORT).show();
         }
     }
 }

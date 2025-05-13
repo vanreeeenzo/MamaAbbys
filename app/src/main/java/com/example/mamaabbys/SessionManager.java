@@ -7,6 +7,7 @@ public class SessionManager {
     private static final String PREF_NAME = "MamaAbbysSession";
     private static final String KEY_IS_LOGGED_IN = "isLoggedIn";
     private static final String KEY_USERNAME = "username";
+    private static final String KEY_USER_ID = "user_id";
 
     private SharedPreferences pref;
     private SharedPreferences.Editor editor;
@@ -18,9 +19,10 @@ public class SessionManager {
         editor = pref.edit();
     }
 
-    public void setLogin(boolean isLoggedIn, String username) {
+    public void setLogin(boolean isLoggedIn, String username, int userId) {
         editor.putBoolean(KEY_IS_LOGGED_IN, isLoggedIn);
         editor.putString(KEY_USERNAME, username);
+        editor.putInt(KEY_USER_ID, userId);
         editor.commit();
     }
 
@@ -30,6 +32,10 @@ public class SessionManager {
 
     public String getUsername() {
         return pref.getString(KEY_USERNAME, "");
+    }
+
+    public int getUserId() {
+        return pref.getInt(KEY_USER_ID, -1);
     }
 
     public void logout() {

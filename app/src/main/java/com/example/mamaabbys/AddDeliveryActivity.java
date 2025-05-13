@@ -23,6 +23,7 @@ public class AddDeliveryActivity extends AppCompatActivity {
     MyDataBaseHelper myDB;
     private Calendar selectedDate;
     private Calendar currentDate;
+    private SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,6 +46,8 @@ public class AddDeliveryActivity extends AppCompatActivity {
 
         btnClose.setOnClickListener(v -> finish());
 
+        sessionManager = new SessionManager(this);
+
         btnSaveDelivery.setOnClickListener(v -> {
             String order = editTextOrder.getText().toString().trim();
             String date = editTextDate.getText().toString().trim();
@@ -62,8 +65,14 @@ public class AddDeliveryActivity extends AppCompatActivity {
                 return;
             }
 
+            int userId = sessionManager.getUserId();
+            if (userId == -1) {
+                Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             Delivery delivery = new Delivery(order, date, time, location);
-            boolean success = myDB.addDelivery(delivery);
+            boolean success = myDB.addDelivery(delivery, userId);
             if (success) {
                 Toast.makeText(this, "Delivery saved successfully", Toast.LENGTH_SHORT).show();
                 clearFields();

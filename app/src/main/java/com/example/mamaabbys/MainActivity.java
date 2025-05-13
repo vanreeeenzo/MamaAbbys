@@ -22,6 +22,15 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.firebase.database.FirebaseDatabase;
+import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.app.PendingIntent;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.os.Build;
 
 import java.io.File;
 import java.util.List;
@@ -42,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
     private BroadcastReceiver notificationReadReceiver;
     private BroadcastReceiver refreshReceiver;
     private SessionManager sessionManager;
+    private static final String CHANNEL_ID = "mamaabbys_channel_01";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -415,17 +425,22 @@ public class MainActivity extends AppCompatActivity {
             }
 
             // Get all notifications from database
-            List<Delivery> deliveries = dbHelper.getAllDeliveries();
+            int userId = sessionManager.getUserId();
+            if (userId == -1) {
+                Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            List<Delivery> deliveries = dbHelper.getAllDeliveries(userId);
             boolean hasUnreadNotifications = false;
 
             for (Delivery delivery : deliveries) {
                 // Skip if notification was previously deleted
-                if (dbHelper.isNotificationDeleted(delivery.getId())) {
+                if (dbHelper.isNotificationDeleted(delivery.getId(), userId)) {
                     continue;
                 }
 
                 // Check if notification is unread
-                if (!dbHelper.isNotificationRead(delivery.getId())) {
+                if (!dbHelper.isNotificationRead(delivery.getId(), userId)) {
                     hasUnreadNotifications = true;
                     break;
                 }
@@ -499,6 +514,55 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.e(TAG, "Error refreshing inventory list: " + e.getMessage());
         }
+    }
+
+    private void checkAndNotifyDeliveries(List<Delivery> deliveries) {
+        if (deliveries == null || deliveries.isEmpty()) return;
+
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        for (Delivery delivery : deliveries) {
+            // Skip if notification was already deleted or read
+            if (dbHelper.isNotificationDeleted(delivery.getId(), userId)) {
+                continue;
+            }
+            if (!dbHelper.isNotificationRead(delivery.getId(), userId)) {
+                showDeliveryNotification(delivery);
+            }
+        }
+    }
+
+    private void showDeliveryNotification(Delivery delivery) {
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_bell)
+                .setContentTitle("New Delivery")
+                .setContentText(delivery.getOrderDescription())
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setAutoCancel(true);
+
+        Intent intent = new Intent(this, DeliveryDetailsActivity.class);
+        intent.putExtra("delivery_id", delivery.getId());
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
+        builder.setContentIntent(pendingIntent);
+
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        notificationManager.notify(delivery.getId().hashCode(), builder.build());
+        
+        // Mark notification as read
+        dbHelper.markNotificationAsRead(delivery.getId(), userId);
     }
 }
 

@@ -37,11 +37,13 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
     private Spinner productsSpinner;
     private Map<String, List<String>> productCategories;
     private volatile boolean isLoading = false;
+    private SessionManager sessionManager;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         dbHelper = new MyDataBaseHelper(requireContext());
+        sessionManager = new SessionManager(requireContext());
     }
 
     @Nullable
@@ -109,95 +111,13 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
     }
 
     public void loadInventoryData() {
-        if (isLoading) return;
-        isLoading = true;
-        if (swipeRefreshLayout != null) {
-            swipeRefreshLayout.setRefreshing(true);
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            Toast.makeText(requireContext(), "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            return;
         }
-
-        new Thread(() -> {
-            try {
-                List<InventoryItem> allItems = dbHelper.getAllInventoryItems();
-                
-                // Check if spinners are initialized and have selections
-                if (categoriesSpinner == null || productsSpinner == null || 
-                    categoriesSpinner.getSelectedItem() == null || 
-                    productsSpinner.getSelectedItem() == null) {
-                    // If spinners are not ready, show all items
-                    currentItems = allItems;
-                    requireActivity().runOnUiThread(() -> {
-                        updateAdapter(allItems);
-                        if (swipeRefreshLayout != null) {
-                            swipeRefreshLayout.setRefreshing(false);
-                        }
-                        isLoading = false;
-                    });
-                    return;
-                }
-
-                String selectedCategory = categoriesSpinner.getSelectedItem().toString();
-                String selectedProduct = productsSpinner.getSelectedItem().toString();
-
-                List<InventoryItem> filteredItems = new ArrayList<>();
-
-                // If "All Categories" is selected, show all items
-                if (selectedCategory.equals("All Categories")) {
-                    currentItems = allItems;
-                    requireActivity().runOnUiThread(() -> {
-                        updateAdapter(allItems);
-                        if (swipeRefreshLayout != null) {
-                            swipeRefreshLayout.setRefreshing(false);
-                        }
-                        isLoading = false;
-                    });
-                    return;
-                }
-
-                // If "All Products" is selected for a specific category, show all items in that category
-                if (selectedProduct.equals("All Products")) {
-                    for (InventoryItem item : allItems) {
-                        if (item.getCategory().equals(selectedCategory)) {
-                            filteredItems.add(item);
-                        }
-                    }
-                    currentItems = filteredItems;
-                    requireActivity().runOnUiThread(() -> {
-                        updateAdapter(filteredItems);
-                        if (swipeRefreshLayout != null) {
-                            swipeRefreshLayout.setRefreshing(false);
-                        }
-                        isLoading = false;
-                    });
-                    return;
-                }
-
-                // Filter by both category and specific product
-                for (InventoryItem item : allItems) {
-                    if (item.getCategory().equals(selectedCategory) && 
-                        item.getName().equals(selectedProduct)) {
-                        filteredItems.add(item);
-                    }
-                }
-
-                currentItems = filteredItems;
-                requireActivity().runOnUiThread(() -> {
-                    updateAdapter(filteredItems);
-                    if (swipeRefreshLayout != null) {
-                        swipeRefreshLayout.setRefreshing(false);
-                    }
-                    isLoading = false;
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading inventory data: " + e.getMessage());
-                requireActivity().runOnUiThread(() -> {
-                    if (swipeRefreshLayout != null) {
-                        swipeRefreshLayout.setRefreshing(false);
-                    }
-                    isLoading = false;
-                    showErrorToast("Error loading inventory data");
-                });
-            }
-        }).start();
+        currentItems = dbHelper.getAllInventoryItems(userId);
+        updateAdapter(currentItems);
     }
 
     private void updateAdapter(List<InventoryItem> items) {
@@ -349,13 +269,13 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
         if (currentItems == null) return;
 
         new Thread(() -> {
-            List<InventoryItem> filteredList = new ArrayList<>();
-            for (InventoryItem item : currentItems) {
-                if (item.getName().toLowerCase().contains(searchQuery) ||
-                    item.getCategory().toLowerCase().contains(searchQuery)) {
-                    filteredList.add(item);
-                }
+            int userId = sessionManager.getUserId();
+            if (userId == -1) {
+                requireActivity().runOnUiThread(() -> 
+                    Toast.makeText(requireContext(), "User session expired. Please login again.", Toast.LENGTH_SHORT).show());
+                return;
             }
+            List<InventoryItem> filteredList = dbHelper.searchInventoryItems(searchQuery, userId);
             requireActivity().runOnUiThread(() -> updateAdapter(filteredList));
         }).start();
     }

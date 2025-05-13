@@ -9,6 +9,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import android.database.Cursor;
 
 public class Login extends AppCompatActivity {
 
@@ -48,15 +49,16 @@ public class Login extends AppCompatActivity {
                 String usernames = "javaro";
                 String passwords = "123";
 
-                if (username.equals(usernames) && password.equals(passwords)){
-                    sessionManager.setLogin(true, username);
+                if (username.equals(usernames) && password.equals(passwords)) {
+                    // For the default user, use ID 1
+                    sessionManager.setLogin(true, username, 1);
                     Intent intent = new Intent(Login.this, MainActivity.class);
                     startActivity(intent);
                     finish();
                 } else {
-                    boolean Logged = myDB.checkUser(username, password);
-                    if (Logged) {
-                        sessionManager.setLogin(true, username);
+                    int userId = myDB.getUserId(username, password);
+                    if (userId != -1) {
+                        sessionManager.setLogin(true, username, userId);
                         Intent intent = new Intent(Login.this, MainActivity.class);
                         startActivity(intent);
                         finish();

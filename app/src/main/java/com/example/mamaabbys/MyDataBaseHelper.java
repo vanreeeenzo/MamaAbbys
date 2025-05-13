@@ -30,6 +30,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
+    private static final String COLUMN_USER_ID = "user_id";
     private static final String COLUMN_NAME = "Product_Name";
     private static final String COLUMN_CATEGORY = "Product_Category";
     private static final String COLUMN_QTY = "Product_Qty";
@@ -37,7 +38,6 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String COLUMN_MIN_THRESHOLD = "Product_Min_Threshold";
 
     private static final String TABLE_USERS = "users";
-    private static final String COLUMN_USER_ID = "id";
     private static final String COLUMN_FULLNAME = "fullname";
     private static final String COLUMN_EMAIL = "email";
     private static final String COLUMN_PASSWORD = "password";
@@ -271,6 +271,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         switch (tableName) {
             case TABLE_INVENTORY:
                 columns.put(COLUMN_ID, "INTEGER PRIMARY KEY AUTOINCREMENT");
+                columns.put(COLUMN_USER_ID, "INTEGER NOT NULL");
                 columns.put(COLUMN_NAME, "TEXT NOT NULL");
                 columns.put(COLUMN_CATEGORY, "TEXT NOT NULL");
                 columns.put(COLUMN_QTY, "INTEGER DEFAULT 0");
@@ -290,11 +291,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private void createInventoryTable(SQLiteDatabase db) {
         String query = "CREATE TABLE " + TABLE_INVENTORY + "(" +
                 COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_USER_ID + " INTEGER NOT NULL, " +
                 COLUMN_NAME + " TEXT NOT NULL, " +
                 COLUMN_CATEGORY + " TEXT NOT NULL, " +
                 COLUMN_QTY + " INTEGER DEFAULT 0, " +
                 COLUMN_PRICE + " FLOAT NOT NULL, " +
-                COLUMN_MIN_THRESHOLD + " INTEGER DEFAULT 10);";
+                COLUMN_MIN_THRESHOLD + " INTEGER DEFAULT 10, " +
+                "FOREIGN KEY(" + COLUMN_USER_ID + ") REFERENCES " + TABLE_USERS + "(" + COLUMN_USER_ID + "));";
         db.execSQL(query);
         Log.d(TAG, "Inventory table created");
     }
@@ -302,10 +305,12 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private void createOrdersTable(SQLiteDatabase db) {
         String query = "CREATE TABLE " + TABLE_ORDERS + "(" +
                 COLUMN_ORDER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_USER_ID + " INTEGER NOT NULL, " +
                 COLUMN_ORDER_DATE + " TEXT NOT NULL, " +
                 COLUMN_ORDER_TIME + " TEXT NOT NULL, " +
                 COLUMN_ORDER_TOTAL + " FLOAT NOT NULL, " +
-                COLUMN_ORDER_STATUS + " TEXT DEFAULT 'Completed');";
+                COLUMN_ORDER_STATUS + " TEXT DEFAULT 'Completed', " +
+                "FOREIGN KEY(" + COLUMN_USER_ID + ") REFERENCES " + TABLE_USERS + "(" + COLUMN_USER_ID + "));";
         db.execSQL(query);
         Log.d(TAG, "Orders table created");
     }
@@ -337,12 +342,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private void createDeliveryTable(SQLiteDatabase db) {
         String query = "CREATE TABLE " + TABLE_DELIVERY + " (" +
                 COLUMN_DELIVERY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_USER_ID + " INTEGER NOT NULL, " +
                 COLUMN_ORDER + " TEXT, " +
                 COLUMN_DATE + " TEXT, " +
                 COLUMN_TIME + " TEXT, " +
                 COLUMN_STATUS + " TEXT, " +
-                COLUMN_LOCATION + " TEXT" +
-                ")";
+                COLUMN_LOCATION + " TEXT, " +
+                "FOREIGN KEY(" + COLUMN_USER_ID + ") REFERENCES " + TABLE_USERS + "(" + COLUMN_USER_ID + "));";
         db.execSQL(query);
         Log.d(TAG, "Delivery table created");
     }
@@ -572,7 +578,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public boolean addInventory(String name, String category, int qty) {
+    public boolean addInventory(String name, String category, int qty, int userId) {
         SQLiteDatabase db = null;
         Cursor cursor = null;
         try {
@@ -588,11 +594,11 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             float price = getProductPrice(productKey);
             int min_threshold = PRODUCT_THRESHOLDS.getOrDefault(productKey, 10);
 
-            // Check if product exists with the same name, category AND price
+            // Check if product exists with the same name, category AND price for this user
             cursor = db.query(TABLE_INVENTORY,
                     new String[]{COLUMN_ID, COLUMN_QTY},
-                    COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ? AND " + COLUMN_PRICE + " = ?",
-                    new String[]{name, category, String.valueOf(price)},
+                    COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ? AND " + COLUMN_PRICE + " = ? AND " + COLUMN_USER_ID + " = ?",
+                    new String[]{name, category, String.valueOf(price), String.valueOf(userId)},
                     null, null, null);
 
             ContentValues cv = new ContentValues();
@@ -600,6 +606,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             cv.put(COLUMN_CATEGORY, category);
             cv.put(COLUMN_PRICE, price);
             cv.put(COLUMN_MIN_THRESHOLD, min_threshold);
+            cv.put(COLUMN_USER_ID, userId);
 
             if (cursor != null && cursor.moveToFirst()) {
                 // Product exists with same price, update quantity
@@ -607,8 +614,8 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 cv.put(COLUMN_QTY, currentQty + qty);
                 
                 int rowsAffected = db.update(TABLE_INVENTORY, cv,
-                        COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ? AND " + COLUMN_PRICE + " = ?",
-                        new String[]{name, category, String.valueOf(price)});
+                        COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ? AND " + COLUMN_PRICE + " = ? AND " + COLUMN_USER_ID + " = ?",
+                        new String[]{name, category, String.valueOf(price), String.valueOf(userId)});
                 
                 if (rowsAffected > 0) {
                     db.setTransactionSuccessful();
@@ -696,13 +703,14 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return products;
     }
 
-    public boolean isProductExists(String productName, String category) {
+    public boolean isProductExists(String productName, String category, int userId) {
         SQLiteDatabase db = null;
         Cursor cursor = null;
         try {
             db = this.getReadableDatabase();
-            String query = "SELECT * FROM " + TABLE_INVENTORY + " WHERE " + COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ?";
-            cursor = db.rawQuery(query, new String[]{productName, category});
+            String query = "SELECT * FROM " + TABLE_INVENTORY + 
+                         " WHERE " + COLUMN_NAME + " = ? AND " + COLUMN_CATEGORY + " = ? AND " + COLUMN_USER_ID + " = ?";
+            cursor = db.rawQuery(query, new String[]{productName, category, String.valueOf(userId)});
             return cursor.getCount() > 0;
         } catch (Exception e) {
             Log.e(TAG, "Error in isProductExists: " + e.getMessage());
@@ -714,15 +722,16 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public List<InventoryItem> getAllInventoryItems() {
+    public List<InventoryItem> getAllInventoryItems(int userId) {
         List<InventoryItem> inventoryItems = new ArrayList<>();
         SQLiteDatabase db = null;
         Cursor cursor = null;
         try {
             db = this.getReadableDatabase();
             String query = "SELECT " + COLUMN_ID + ", " + COLUMN_NAME + ", " + COLUMN_CATEGORY + ", " +
-                    COLUMN_QTY + ", " + COLUMN_PRICE + ", " + COLUMN_MIN_THRESHOLD + " FROM " + TABLE_INVENTORY;
-            cursor = db.rawQuery(query, null);
+                    COLUMN_QTY + ", " + COLUMN_PRICE + ", " + COLUMN_MIN_THRESHOLD + " FROM " + TABLE_INVENTORY +
+                    " WHERE " + COLUMN_USER_ID + " = ?";
+            cursor = db.rawQuery(query, new String[]{String.valueOf(userId)});
 
             if (cursor.moveToFirst()) {
                 do {
@@ -789,7 +798,34 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return result;
     }
 
-    public List<InventoryItem> searchInventoryItems(String query) {
+    public int getUserId(String fullname, String password) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_USERS,
+                    new String[]{COLUMN_USER_ID},
+                    COLUMN_FULLNAME + " = ? AND " + COLUMN_PASSWORD + " = ?",
+                    new String[]{fullname, password},
+                    null, null, null);
+            
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursor.getInt(0);
+            }
+            return -1;
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting user ID: " + e.getMessage());
+            return -1;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
+    }
+
+    public List<InventoryItem> searchInventoryItems(String query, int userId) {
         List<InventoryItem> inventoryItems = new ArrayList<>();
         SQLiteDatabase db = null;
         Cursor cursor = null;
@@ -797,9 +833,9 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             db = this.getReadableDatabase();
             String searchQuery = "SELECT " + COLUMN_ID + ", " + COLUMN_NAME + ", " + COLUMN_CATEGORY + ", " +
                     COLUMN_QTY + ", " + COLUMN_PRICE + ", " + COLUMN_MIN_THRESHOLD + " FROM " + TABLE_INVENTORY +
-                    " WHERE " + COLUMN_NAME + " LIKE ? OR " + COLUMN_CATEGORY + " LIKE ?";
+                    " WHERE (" + COLUMN_NAME + " LIKE ? OR " + COLUMN_CATEGORY + " LIKE ?) AND " + COLUMN_USER_ID + " = ?";
             String searchPattern = "%" + query + "%";
-            cursor = db.rawQuery(searchQuery, new String[]{searchPattern, searchPattern});
+            cursor = db.rawQuery(searchQuery, new String[]{searchPattern, searchPattern, String.valueOf(userId)});
 
             if (cursor.moveToFirst()) {
                 do {
@@ -834,7 +870,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return inventoryItems;
     }
 
-    public boolean addDelivery(Delivery delivery) {
+    public boolean addDelivery(Delivery delivery, int userId) {
         SQLiteDatabase db = null;
         try {
             db = this.getWritableDatabase();
@@ -844,6 +880,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             values.put(COLUMN_TIME, delivery.getDeliveryTime());
             values.put(COLUMN_STATUS, "Pending");
             values.put(COLUMN_LOCATION, delivery.getLocation());
+            values.put(COLUMN_USER_ID, userId);
 
             long result = db.insert(TABLE_DELIVERY, null, values);
             if (result == -1) {
@@ -863,7 +900,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public List<Delivery> getAllDeliveries() {
+    public List<Delivery> getAllDeliveries(int userId) {
         List<Delivery> deliveries = new ArrayList<>();
         SQLiteDatabase db = null;
         Cursor cursor = null;
@@ -871,8 +908,9 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         try {
             db = this.getReadableDatabase();
             String query = "SELECT * FROM " + TABLE_DELIVERY +
+                    " WHERE " + COLUMN_USER_ID + " = ?" +
                     " ORDER BY " + COLUMN_DATE + " DESC, " + COLUMN_TIME + " DESC";
-            cursor = db.rawQuery(query, null);
+            cursor = db.rawQuery(query, new String[]{String.valueOf(userId)});
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {
@@ -931,12 +969,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public boolean markNotificationAsDeleted(String deliveryId) {
+    public boolean markNotificationAsDeleted(String deliveryId, int userId) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
             ContentValues values = new ContentValues();
             values.put(COLUMN_DELIVERY_ID, deliveryId);
             values.put(COLUMN_DELETED_AT, System.currentTimeMillis());
+            values.put(COLUMN_USER_ID, userId);
 
             long result = db.insert(TABLE_DELETED_NOTIFICATIONS, null, values);
             return result != -1;
@@ -950,13 +989,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public boolean isNotificationDeleted(String deliveryId) {
+    public boolean isNotificationDeleted(String deliveryId, int userId) {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
         try {
             String query = "SELECT * FROM " + TABLE_DELETED_NOTIFICATIONS +
-                    " WHERE " + COLUMN_DELIVERY_ID + " = ?";
-            cursor = db.rawQuery(query, new String[]{deliveryId});
+                    " WHERE " + COLUMN_DELIVERY_ID + " = ? AND " + COLUMN_USER_ID + " = ?";
+            cursor = db.rawQuery(query, new String[]{deliveryId, String.valueOf(userId)});
             return cursor != null && cursor.getCount() > 0;
         } catch (Exception e) {
             Log.e(TAG, "Error checking deleted notification: " + e.getMessage());
@@ -1003,12 +1042,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public boolean markNotificationAsRead(String notificationId) {
+    public boolean markNotificationAsRead(String notificationId, int userId) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
             ContentValues values = new ContentValues();
             values.put(COLUMN_NOTIFICATION_ID, notificationId);
             values.put(COLUMN_READ_AT, System.currentTimeMillis());
+            values.put(COLUMN_USER_ID, userId);
 
             long result = db.insertWithOnConflict(TABLE_READ_NOTIFICATIONS, null, values, 
                     SQLiteDatabase.CONFLICT_REPLACE);
@@ -1023,13 +1063,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public boolean isNotificationRead(String notificationId) {
+    public boolean isNotificationRead(String notificationId, int userId) {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
         try {
             String query = "SELECT * FROM " + TABLE_READ_NOTIFICATIONS +
-                    " WHERE " + COLUMN_NOTIFICATION_ID + " = ?";
-            cursor = db.rawQuery(query, new String[]{notificationId});
+                    " WHERE " + COLUMN_NOTIFICATION_ID + " = ? AND " + COLUMN_USER_ID + " = ?";
+            cursor = db.rawQuery(query, new String[]{notificationId, String.valueOf(userId)});
             return cursor != null && cursor.getCount() > 0;
         } catch (Exception e) {
             Log.e(TAG, "Error checking read notification: " + e.getMessage());
@@ -1050,7 +1090,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         try {
             db = this.getWritableDatabase();
             cursor = db.query(TABLE_INVENTORY,
-                    new String[]{COLUMN_QTY, COLUMN_PRICE, COLUMN_NAME},
+                    new String[]{COLUMN_QTY, COLUMN_PRICE, COLUMN_NAME, COLUMN_USER_ID},
                     COLUMN_ID + " = ?",
                     new String[]{itemId},
                     null, null, null);
@@ -1059,6 +1099,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 int currentQty = cursor.getInt(0);
                 float price = cursor.getFloat(1);
                 String productName = cursor.getString(2);
+                int userId = cursor.getInt(3);
 
                 if (currentQty >= quantity) {
                     int newQty = currentQty - quantity;
@@ -1080,6 +1121,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                         orderValues.put(COLUMN_ORDER_TIME, currentTime);
                         orderValues.put(COLUMN_ORDER_TOTAL, totalAmount);
                         orderValues.put(COLUMN_ORDER_STATUS, "Completed");
+                        orderValues.put(COLUMN_USER_ID, userId);
 
                         long orderId = db.insert(TABLE_ORDERS, null, orderValues);
 
@@ -1101,6 +1143,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                         }
                         return "Failed to record sale";
                     } catch (Exception e) {
+                        Log.e(TAG, "Error recording sale: " + e.getMessage());
                         return "Error recording sale: " + e.getMessage();
                     } finally {
                         db.endTransaction();
@@ -1112,6 +1155,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 return "Product not found!";
             }
         } catch (Exception e) {
+            Log.e(TAG, "Error in sellInventoryItem: " + e.getMessage());
             return "Error recording sale: " + e.getMessage();
         } finally {
             if (cursor != null) {
@@ -1123,7 +1167,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public List<Order> getAllOrders() {
+    public List<Order> getAllOrders(int userId) {
         List<Order> orders = new ArrayList<>();
         SQLiteDatabase db = null;
         Cursor cursor = null;
@@ -1136,7 +1180,9 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             
             cursor = db.query(TABLE_ORDERS,
                     new String[]{COLUMN_ORDER_ID, COLUMN_ORDER_DATE, COLUMN_ORDER_TIME, COLUMN_ORDER_TOTAL, COLUMN_ORDER_STATUS},
-                    null, null, null, null, orderBy);
+                    COLUMN_USER_ID + " = ?",
+                    new String[]{String.valueOf(userId)},
+                    null, null, orderBy);
             
             if (cursor != null && cursor.moveToFirst()) {
                 do {
@@ -1147,48 +1193,12 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     String status = cursor.getString(4);
                     
                     Order order = new Order(id, date, time, total, status);
-                    
-                    // Get order items
-                    Cursor itemsCursor = db.query(TABLE_ORDER_ITEMS,
-                            new String[]{COLUMN_ORDER_PRODUCT_ID, COLUMN_ORDER_QUANTITY, COLUMN_ORDER_ITEM_PRICE, COLUMN_ORDER_ITEM_TOTAL},
-                            COLUMN_ORDER_ID_FK + " = ?",
-                            new String[]{id},
-                            null, null, null);
-                    
-                    if (itemsCursor != null && itemsCursor.moveToFirst()) {
-                        do {
-                            String productId = itemsCursor.getString(0);
-                            int quantity = itemsCursor.getInt(1);
-                            double price = itemsCursor.getDouble(2);
-                            double itemTotal = itemsCursor.getDouble(3);
-                            
-                            // Get product name
-                            Cursor productCursor = db.query(TABLE_INVENTORY,
-                                    new String[]{COLUMN_NAME},
-                                    COLUMN_ID + " = ?",
-                                    new String[]{productId},
-                                    null, null, null);
-                            
-                            String productName = "";
-                            if (productCursor != null && productCursor.moveToFirst()) {
-                                productName = productCursor.getString(0);
-                            }
-                            if (productCursor != null) {
-                                productCursor.close();
-                            }
-                            
-                            order.addItem(new Order.OrderItem(productId, productName, quantity, price, itemTotal));
-                        } while (itemsCursor.moveToNext());
-                    }
-                    if (itemsCursor != null) {
-                        itemsCursor.close();
-                    }
-                    
+                    order.setItems(getOrderItems(id));
                     orders.add(order);
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting orders: " + e.getMessage());
+            Log.e(TAG, "Error getting all orders: " + e.getMessage());
         } finally {
             if (cursor != null && !cursor.isClosed()) {
                 cursor.close();
@@ -1221,7 +1231,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public SalesSummary getSalesSummary() {
+    public SalesSummary getSalesSummary(int userId) {
         SQLiteDatabase db = null;
         Cursor cursor = null;
         SalesSummary summary = new SalesSummary();
@@ -1231,10 +1241,11 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             
             // Get total revenue and total orders in a single query
             String query = "SELECT COUNT(*) as total_orders, " +
-                         "COALESCE(SUM(" + COLUMN_TOTAL_AMOUNT + "), 0) as total_revenue " +
-                         "FROM " + TABLE_SALES;
+                         "COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as total_revenue " +
+                         "FROM " + TABLE_ORDERS + 
+                         " WHERE " + COLUMN_USER_ID + " = ?";
             
-            cursor = db.rawQuery(query, null);
+            cursor = db.rawQuery(query, new String[]{String.valueOf(userId)});
             
             if (cursor != null && cursor.moveToFirst()) {
                 int totalOrders = cursor.getInt(0);
@@ -1242,8 +1253,6 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 
                 summary.setTotalOrders(totalOrders);
                 summary.setTotalRevenue(totalRevenue);
-                
-                // Average order value will be calculated automatically in SalesSummary
             }
             
         } catch (Exception e) {
@@ -1260,7 +1269,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return summary;
     }
 
-    public List<SalesRecord> getRecentSales() {
+    public List<SalesRecord> getRecentSales(int userId) {
         List<SalesRecord> salesRecords = new ArrayList<>();
         SQLiteDatabase db = null;
         Cursor cursor = null;
@@ -1275,9 +1284,10 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                     " FROM " + TABLE_SALES + " s" +
                     " LEFT JOIN " + TABLE_INVENTORY + " i ON s." + COLUMN_PRODUCT_ID + 
                     " = i." + COLUMN_ID +
+                    " WHERE i." + COLUMN_USER_ID + " = ?" +
                     " ORDER BY s." + COLUMN_SALE_DATE + " DESC";
             
-            cursor = db.rawQuery(query, null);
+            cursor = db.rawQuery(query, new String[]{String.valueOf(userId)});
             
             if (cursor != null && cursor.moveToFirst()) {
                 do {
@@ -1319,12 +1329,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public List<InventoryItem> getOutOfStockItems() {
+    public List<InventoryItem> getOutOfStockItems(int userId) {
         List<InventoryItem> outOfStockItems = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         
-        String query = "SELECT * FROM " + TABLE_INVENTORY + " WHERE " + COLUMN_QTY + " = 0";
-        Cursor cursor = db.rawQuery(query, null);
+        String query = "SELECT * FROM " + TABLE_INVENTORY + 
+                      " WHERE " + COLUMN_QTY + " = 0 AND " + COLUMN_USER_ID + " = ?";
+        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(userId)});
         
         if (cursor.moveToFirst()) {
             do {
@@ -1350,19 +1361,19 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return outOfStockItems;
     }
 
-    public double getTodayRevenue() {
-        return getRevenueByDate(getTodayDate());
+    public double getTodayRevenue(int userId) {
+        return getRevenueByDate(getTodayDate(), userId);
     }
 
-    public double getWeeklyRevenue() {
-        return getRevenueByDateRange(getWeekStartDate(), getTodayDate());
+    public double getWeeklyRevenue(int userId) {
+        return getRevenueByDateRange(getWeekStartDate(), getTodayDate(), userId);
     }
 
-    public double getMonthlyRevenue() {
-        return getRevenueByDateRange(getMonthStartDate(), getTodayDate());
+    public double getMonthlyRevenue(int userId) {
+        return getRevenueByDateRange(getMonthStartDate(), getTodayDate(), userId);
     }
 
-    private double getRevenueByDate(String date) {
+    private double getRevenueByDate(String date, int userId) {
         double revenue = 0.0;
         SQLiteDatabase db = null;
         Cursor cursor = null;
@@ -1371,9 +1382,9 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             db = this.getReadableDatabase();
             String query = "SELECT COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as total" +
                          " FROM " + TABLE_ORDERS +
-                         " WHERE date(" + COLUMN_ORDER_DATE + ") = date(?)";
+                         " WHERE date(" + COLUMN_ORDER_DATE + ") = date(?) AND " + COLUMN_USER_ID + " = ?";
             
-            cursor = db.rawQuery(query, new String[]{date});
+            cursor = db.rawQuery(query, new String[]{date, String.valueOf(userId)});
             
             if (cursor != null && cursor.moveToFirst()) {
                 revenue = cursor.getDouble(0);
@@ -1392,7 +1403,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return revenue;
     }
 
-    private double getRevenueByDateRange(String startDate, String endDate) {
+    private double getRevenueByDateRange(String startDate, String endDate, int userId) {
         double revenue = 0.0;
         SQLiteDatabase db = null;
         Cursor cursor = null;
@@ -1401,9 +1412,9 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             db = this.getReadableDatabase();
             String query = "SELECT COALESCE(SUM(" + COLUMN_ORDER_TOTAL + "), 0) as total" +
                          " FROM " + TABLE_ORDERS +
-                         " WHERE date(" + COLUMN_ORDER_DATE + ") BETWEEN date(?) AND date(?)";
+                         " WHERE date(" + COLUMN_ORDER_DATE + ") BETWEEN date(?) AND date(?) AND " + COLUMN_USER_ID + " = ?";
             
-            cursor = db.rawQuery(query, new String[]{startDate, endDate});
+            cursor = db.rawQuery(query, new String[]{startDate, endDate, String.valueOf(userId)});
             
             if (cursor != null && cursor.moveToFirst()) {
                 revenue = cursor.getDouble(0);
@@ -1630,7 +1641,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public List<Order> getOrdersByDate(String date) {
+    public List<Order> getOrdersByDate(String date, int userId) {
         List<Order> orders = new ArrayList<>();
         SQLiteDatabase db = null;
         Cursor cursor = null;
@@ -1638,10 +1649,10 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         try {
             db = this.getReadableDatabase();
             String query = "SELECT * FROM " + TABLE_ORDERS + 
-                         " WHERE date(" + COLUMN_ORDER_DATE + ") = date(?)" +
+                         " WHERE date(" + COLUMN_ORDER_DATE + ") = date(?) AND " + COLUMN_USER_ID + " = ?" +
                          " ORDER BY " + COLUMN_ORDER_DATE + " DESC, " + COLUMN_ORDER_TIME + " DESC";
             
-            cursor = db.rawQuery(query, new String[]{date});
+            cursor = db.rawQuery(query, new String[]{date, String.valueOf(userId)});
             
             if (cursor != null && cursor.moveToFirst()) {
                 do {
@@ -1670,7 +1681,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         return orders;
     }
 
-    public List<Order> getOrdersByDateRange(String startDate, String endDate) {
+    public List<Order> getOrdersByDateRange(String startDate, String endDate, int userId) {
         List<Order> orders = new ArrayList<>();
         SQLiteDatabase db = null;
         Cursor cursor = null;
@@ -1678,10 +1689,10 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         try {
             db = this.getReadableDatabase();
             String query = "SELECT * FROM " + TABLE_ORDERS + 
-                         " WHERE date(" + COLUMN_ORDER_DATE + ") BETWEEN date(?) AND date(?)" +
+                         " WHERE date(" + COLUMN_ORDER_DATE + ") BETWEEN date(?) AND date(?) AND " + COLUMN_USER_ID + " = ?" +
                          " ORDER BY " + COLUMN_ORDER_DATE + " DESC, " + COLUMN_ORDER_TIME + " DESC";
             
-            cursor = db.rawQuery(query, new String[]{startDate, endDate});
+            cursor = db.rawQuery(query, new String[]{startDate, endDate, String.valueOf(userId)});
             
             if (cursor != null && cursor.moveToFirst()) {
                 do {

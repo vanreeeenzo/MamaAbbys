@@ -28,20 +28,26 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
     private SwipeRefreshLayout swipeRefreshLayout;
     private Context context;
     private Map<String, Boolean> doneMap = new HashMap<>();
+    private SessionManager sessionManager;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        myDB = new MyDataBaseHelper(requireContext());
+        sessionManager = new SessionManager(requireContext());
+    }
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_delivery, container, false);
-    }
-
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-
-        myDB = new MyDataBaseHelper(getContext());
+        View view = inflater.inflate(R.layout.fragment_delivery, container, false);
         recyclerView = view.findViewById(R.id.deliveryRecyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+
+        // Initialize adapter with empty list
+        List<DeliveryItem> items = new ArrayList<>();
+        adapter = new DeliveryAdapter(getContext(), items, this);
+        recyclerView.setAdapter(adapter);
 
         swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
         swipeRefreshLayout.setOnRefreshListener(this::loadDeliveries);
@@ -53,38 +59,86 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
         });
 
         loadDeliveries();
+        return view;
     }
 
     private void loadDeliveries() {
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            Toast.makeText(requireContext(), "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<Delivery> deliveries = myDB.getAllDeliveries(userId);
         List<DeliveryItem> items = new ArrayList<>();
-        List<Delivery> deliveries = myDB.getAllDeliveries();
-
+        
         for (Delivery delivery : deliveries) {
             String schedule = "Scheduled for " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime();
             DeliveryItem item = new DeliveryItem(
-                    delivery.getId(),
-                    delivery.getOrderDescription(),
-                    schedule,
-                    delivery.getLocation(),
-                    R.drawable.ic_truck
+                delivery.getId(),
+                delivery.getOrderDescription(),
+                schedule,
+                delivery.getLocation(),
+                R.drawable.ic_truck
             );
-
             item.setDone(delivery.isDone());
             items.add(item);
         }
 
         // Sort: done items at the bottom
         items.sort((a, b) -> Boolean.compare(a.isDone(), b.isDone()));
-
-        if (adapter == null) {
-            adapter = new DeliveryAdapter(getContext(), items, this);
-            recyclerView.setAdapter(adapter);
-        } else {
-            adapter.updateItems(items);
-        }
+        adapter.updateItems(items);
 
         if (swipeRefreshLayout != null) {
             swipeRefreshLayout.setRefreshing(false);
+        }
+    }
+
+    private void refreshDeliveries() {
+        loadDeliveries();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        loadDeliveries();
+
+        // New code to check notifications
+        if (myDB != null) {
+            int userId = sessionManager.getUserId();
+            if (userId != -1) {
+                List<Delivery> deliveries = myDB.getAllDeliveries(userId);
+                DeliveryChecker.checkDeliveries(getContext(), deliveries);
+            }
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (myDB != null) {
+            myDB.close();
+        }
+    }
+
+    private void checkAndNotifyDeliveries() {
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            Toast.makeText(requireContext(), "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<Delivery> deliveries = myDB.getAllDeliveries(userId);
+
+        for (Delivery delivery : deliveries) {
+            // Check if delivery date is 7 days, 3 days, 1 day or today
+            // If yes -> build a notification
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), "your_channel_id")
+                    .setSmallIcon(R.drawable.ic_truck)
+                    .setContentTitle("Upcoming Delivery")
+                    .setContentText("Your order " + delivery.getOrderDescription() + " is coming soon!")
+                    .setPriority(NotificationCompat.PRIORITY_HIGH);
+
+            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getContext());
+            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
         }
     }
 
@@ -105,8 +159,6 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
         }
     }
 
-
-
     @Override
     public void onCancelClicked(DeliveryItem delivery) {
         boolean isDeleted = myDB.deleteDelivery(delivery.getId());
@@ -117,42 +169,4 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
             Toast.makeText(getContext(), "Failed to delete delivery", Toast.LENGTH_SHORT).show();
         }
     }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        loadDeliveries();
-
-        // New code to check notifications
-        if (myDB != null) {
-            List<Delivery> deliveries = myDB.getAllDeliveries();
-            DeliveryChecker.checkDeliveries(getContext(), deliveries);
-        }
-    }
-
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (myDB != null) {
-            myDB.close();
-        }
-    }
-    private void checkAndNotifyDeliveries() {
-        List<Delivery> deliveries = myDB.getAllDeliveries();
-
-        for (Delivery delivery : deliveries) {
-            // Check if delivery date is 7 days, 3 days, 1 day or today
-            // If yes -> build a notification
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), "your_channel_id")
-                    .setSmallIcon(R.drawable.ic_truck)
-                    .setContentTitle("Upcoming Delivery")
-                    .setContentText("Your order " + delivery.getOrderDescription() + " is coming soon!")
-                    .setPriority(NotificationCompat.PRIORITY_HIGH);
-
-            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getContext());
-            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
-        }
-    }
-
 }
