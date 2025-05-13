@@ -26,7 +26,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
     public static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 9;
+    private static final int DATABASE_VERSION = 10;
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
@@ -355,9 +355,10 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
 
     private void createDeletedNotificationsTable(SQLiteDatabase db) {
         String query = "CREATE TABLE " + TABLE_DELETED_NOTIFICATIONS + " (" +
-                COLUMN_NOTIFICATION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
                 COLUMN_DELIVERY_ID + " TEXT NOT NULL," +
-                COLUMN_DELETED_AT + " INTEGER NOT NULL)";
+                COLUMN_USER_ID + " INTEGER NOT NULL," +
+                COLUMN_DELETED_AT + " INTEGER NOT NULL," +
+                "PRIMARY KEY (" + COLUMN_DELIVERY_ID + ", " + COLUMN_USER_ID + "))";
         db.execSQL(query);
         Log.d(TAG, "Deleted notifications table created");
     }
@@ -430,6 +431,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 db.execSQL("DROP TABLE IF EXISTS " + TABLE_READ_NOTIFICATIONS);
                 createReadNotificationsTable(db);
                 Log.d(TAG, "Upgraded read_notifications table");
+            }
+
+            if (oldVersion < 10) {
+                // Drop and recreate deleted_notifications table with new schema
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELETED_NOTIFICATIONS);
+                createDeletedNotificationsTable(db);
+                Log.d(TAG, "Upgraded deleted_notifications table");
             }
             
             db.setTransactionSuccessful();
@@ -983,8 +991,8 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         try {
             ContentValues values = new ContentValues();
             values.put(COLUMN_DELIVERY_ID, deliveryId);
-            values.put(COLUMN_DELETED_AT, System.currentTimeMillis());
             values.put(COLUMN_USER_ID, userId);
+            values.put(COLUMN_DELETED_AT, System.currentTimeMillis());
 
             long result = db.insert(TABLE_DELETED_NOTIFICATIONS, null, values);
             return result != -1;
