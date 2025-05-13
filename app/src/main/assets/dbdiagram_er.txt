@@ -1,0 +1,74 @@
+// MamaAbbys Database Schema
+
+Table Users {
+  user_id integer [pk]
+  fullname varchar
+  email varchar
+  password varchar
+}
+
+Table Inventory {
+  _id integer [pk]
+  user_id integer [ref: > Users.user_id]
+  Product_Name varchar
+  Product_Category varchar
+  Product_Qty integer
+  Product_Price float
+  Product_Min_Threshold integer
+}
+
+Table Orders {
+  id integer [pk]
+  order_date date
+  order_time time
+  order_total float
+  order_status varchar
+  user_id integer [ref: > Users.user_id]
+}
+
+Table Order_Items {
+  id integer [pk]
+  order_id integer [ref: > Orders.id]
+  product_id integer [ref: > Inventory._id]
+  quantity integer
+  price float
+  total float
+}
+
+Table Delivery {
+  id integer [pk]
+  order_description varchar
+  delivery_date date
+  delivery_time time
+  status varchar
+  location varchar
+  user_id integer [ref: > Users.user_id]
+  order_id integer [ref: > Orders.id]
+}
+
+Table Sales {
+  id integer [pk]
+  product_id integer [ref: > Inventory._id]
+  quantity integer
+  total_amount float
+  sale_date date
+  user_id integer [ref: > Users.user_id]
+}
+
+Table Product_Prices {
+  product_name varchar [pk]
+  category varchar
+  price float
+}
+
+Table Deleted_Notifications {
+  notification_id varchar [pk]
+  user_id integer [ref: > Users.user_id]
+  deleted_at datetime
+}
+
+Table Read_Notifications {
+  notification_id varchar [pk]
+  user_id integer [ref: > Users.user_id]
+  read_at datetime
+} 

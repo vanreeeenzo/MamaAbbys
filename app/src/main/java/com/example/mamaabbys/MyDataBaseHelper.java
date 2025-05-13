@@ -26,7 +26,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
     public static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 8;
+    private static final int DATABASE_VERSION = 9;
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
@@ -364,8 +364,10 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
 
     private void createReadNotificationsTable(SQLiteDatabase db) {
         String query = "CREATE TABLE " + TABLE_READ_NOTIFICATIONS + " (" +
-                COLUMN_NOTIFICATION_ID + " TEXT PRIMARY KEY," +
-                COLUMN_READ_AT + " INTEGER NOT NULL)";
+                COLUMN_NOTIFICATION_ID + " TEXT," +
+                COLUMN_USER_ID + " INTEGER," +
+                COLUMN_READ_AT + " INTEGER NOT NULL," +
+                "PRIMARY KEY (" + COLUMN_NOTIFICATION_ID + ", " + COLUMN_USER_ID + "))";
         db.execSQL(query);
         Log.d(TAG, "Read notifications table created");
     }
@@ -421,6 +423,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 createProductPricesTable(db);
                 insertInitialPrices(db);
                 Log.d(TAG, "Upgraded product_prices table");
+            }
+            
+            if (oldVersion < 9) {
+                // Drop and recreate read_notifications table with user_id column
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_READ_NOTIFICATIONS);
+                createReadNotificationsTable(db);
+                Log.d(TAG, "Upgraded read_notifications table");
             }
             
             db.setTransactionSuccessful();
@@ -1047,8 +1056,8 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         try {
             ContentValues values = new ContentValues();
             values.put(COLUMN_NOTIFICATION_ID, notificationId);
-            values.put(COLUMN_READ_AT, System.currentTimeMillis());
             values.put(COLUMN_USER_ID, userId);
+            values.put(COLUMN_READ_AT, System.currentTimeMillis());
 
             long result = db.insertWithOnConflict(TABLE_READ_NOTIFICATIONS, null, values, 
                     SQLiteDatabase.CONFLICT_REPLACE);
