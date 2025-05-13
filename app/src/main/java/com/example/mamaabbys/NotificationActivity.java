@@ -44,8 +44,9 @@ public class NotificationActivity extends AppCompatActivity implements
         adapter = new NotificationAdapter(notificationItems, this, this);
         recyclerView.setAdapter(adapter);
 
-        // Load and check deliveries
+        // Load and check deliveries and stock
         loadNotifications();
+        checkStockStatus();
     }
 
     private void loadNotifications() {
@@ -142,6 +143,69 @@ public class NotificationActivity extends AppCompatActivity implements
             e.printStackTrace();
         }
         return Long.MAX_VALUE;
+    }
+
+    private void checkStockStatus() {
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<InventoryItem> inventoryItems = myDB.getAllInventoryItems(userId);
+        for (InventoryItem item : inventoryItems) {
+            String stockInfo = item.getStockInfo();
+            if (stockInfo.contains("Out of Stock!")) {
+                createOutOfStockNotification(item);
+            } else if (stockInfo.contains("Low Stock!")) {
+                createLowStockNotification(item);
+            }
+        }
+    }
+
+    private void createOutOfStockNotification(InventoryItem item) {
+        String notificationId = "stock_" + item.getId();
+        if (myDB.isNotificationDeleted(notificationId, sessionManager.getUserId())) {
+            return;
+        }
+
+        String title = "Out of Stock Alert";
+        String message = item.getName() + " is out of stock! Please restock soon.";
+        
+        NotificationItem notificationItem = new NotificationItem(
+            notificationId,
+            title,
+            message,
+            item.getName(),
+            item.getQuantity(),
+            item.getMinThreshold()
+        );
+        
+        notificationItems.add(notificationItem);
+        NotificationHelper.showStockNotification(this, title, message);
+    }
+
+    private void createLowStockNotification(InventoryItem item) {
+        String notificationId = "stock_" + item.getId();
+        if (myDB.isNotificationDeleted(notificationId, sessionManager.getUserId())) {
+            return;
+        }
+
+        String title = "Low Stock Alert";
+        String message = item.getName() + " is running low on stock! Current stock: " + 
+                        item.getQuantity() + " (Minimum threshold: " + item.getMinThreshold() + ")";
+        
+        NotificationItem notificationItem = new NotificationItem(
+            notificationId,
+            title,
+            message,
+            item.getName(),
+            item.getQuantity(),
+            item.getMinThreshold()
+        );
+        
+        notificationItems.add(notificationItem);
+        NotificationHelper.showStockNotification(this, title, message);
     }
 
     @Override

@@ -44,8 +44,22 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
         NotificationItem notification = notifications.get(position);
         holder.titleTextView.setText(notification.getTitle());
         holder.messageTextView.setText(notification.getMessage());
-        holder.orderDetailsTextView.setText(notification.getOrderDetails());
-        holder.dateTimeTextView.setText(notification.getDeliveryDate() + " at " + notification.getDeliveryTime());
+
+        if (notification.isDeliveryNotification()) {
+            holder.orderDetailsTextView.setText(notification.getOrderDetails());
+            holder.dateTimeTextView.setText(notification.getDeliveryDate() + " at " + notification.getDeliveryTime());
+            holder.orderDetailsTextView.setVisibility(View.VISIBLE);
+            holder.dateTimeTextView.setVisibility(View.VISIBLE);
+        } else if (notification.isStockNotification()) {
+            String stockInfo = "Current Stock: " + notification.getCurrentStock() + 
+                             " | Minimum Threshold: " + notification.getMinThreshold();
+            holder.orderDetailsTextView.setText(stockInfo);
+            holder.dateTimeTextView.setVisibility(View.GONE);
+            holder.orderDetailsTextView.setVisibility(View.VISIBLE);
+        } else {
+            holder.orderDetailsTextView.setVisibility(View.GONE);
+            holder.dateTimeTextView.setVisibility(View.GONE);
+        }
 
         // Set background color based on read status
         if (notification.isRead()) {
