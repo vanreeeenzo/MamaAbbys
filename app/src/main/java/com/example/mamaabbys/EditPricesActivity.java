@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +40,17 @@ public class EditPricesActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 saveUpdatedPrices();
+            }
+        });
+
+        // Initialize close button
+        MaterialButton closeButton = findViewById(R.id.closeButton);
+        closeButton.setOnClickListener(v -> {
+            // Check if there are unsaved changes
+            if (hasUnsavedChanges()) {
+                showUnsavedChangesDialog();
+            } else {
+                finish();
             }
         });
     }
@@ -97,5 +109,20 @@ public class EditPricesActivity extends AppCompatActivity {
             Toast.makeText(this, "Failed to update some prices:\n" + errorMessage.toString(), 
                 Toast.LENGTH_LONG).show();
         }
+    }
+
+    private boolean hasUnsavedChanges() {
+        // Implement your logic to check for unsaved changes
+        // For example, compare current values with original values
+        return false; // Return true if there are unsaved changes
+    }
+
+    private void showUnsavedChangesDialog() {
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("Unsaved Changes")
+            .setMessage("You have unsaved changes. Do you want to discard them?")
+            .setPositiveButton("Discard", (dialog, which) -> finish())
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 } 

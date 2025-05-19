@@ -11,6 +11,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.List;
 
 public class AddInventory extends AppCompatActivity {
@@ -39,6 +40,17 @@ public class AddInventory extends AppCompatActivity {
         productSpinner = findViewById(R.id.productSpinner);
         quantityInput = findViewById(R.id.quantityInput);
         saveButton = findViewById(R.id.saveButton);
+
+        // Initialize close button
+        MaterialButton closeButton = findViewById(R.id.closeButton);
+        closeButton.setOnClickListener(v -> {
+            // Check if there are unsaved changes
+            if (hasUnsavedChanges()) {
+                showUnsavedChangesDialog();
+            } else {
+                finish();
+            }
+        });
 
         // Setup category spinner
         List<String> categories = myDB.getAllCategories();
@@ -169,6 +181,22 @@ public class AddInventory extends AppCompatActivity {
             Log.e("AddInventory", "Invalid quantity format: " + e.getMessage());
             showToast("Please enter a valid quantity");
         }
+    }
+
+    private boolean hasUnsavedChanges() {
+        // Check if any field has been modified
+        return !quantityInput.getText().toString().trim().isEmpty() ||
+               (categorySpinner.getSelectedItemPosition() != 0) ||
+               (productSpinner.getSelectedItemPosition() != 0);
+    }
+
+    private void showUnsavedChangesDialog() {
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("Unsaved Changes")
+            .setMessage("You have unsaved changes. Do you want to discard them?")
+            .setPositiveButton("Discard", (dialog, which) -> finish())
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 
     @Override

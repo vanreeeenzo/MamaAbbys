@@ -11,6 +11,19 @@
         android:layout_height="wrap_content"
         android:padding="50dp">
 
+        <ImageButton
+            android:id="@+id/closeButton"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="8dp"
+            android:src="@drawable/ic_close"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Close"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:tint="@color/black" />
+
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/categoryLayout"
             android:layout_width="0dp"
