@@ -18,6 +18,7 @@
             android:exported="false" />
         <activity
             android:name=".AddInventory"
+            android:exported="false"
             android:label="Add Inventory"
             android:parentActivityName=".MainActivity" />
         <activity

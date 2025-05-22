@@ -323,11 +323,18 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupClickListeners() {
         fab.setOnClickListener(v -> {
-            int currentPosition = viewPager.getCurrentItem();
-            if (currentPosition == 0) {
-                startActivity(new Intent(MainActivity.this, AddInventory.class));
-            } else if (currentPosition == 2) { // Delivery tab
-                startActivity(new Intent(MainActivity.this, AddDeliveryActivity.class));
+            try {
+                int currentPosition = viewPager.getCurrentItem();
+                if (currentPosition == 0) {
+                    Intent intent = new Intent(MainActivity.this, AddInventory.class);
+                    startActivity(intent);
+                } else if (currentPosition == 2) { // Delivery tab
+                    Intent intent = new Intent(MainActivity.this, AddDeliveryActivity.class);
+                    startActivity(intent);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error launching activity: " + e.getMessage());
+                Toast.makeText(MainActivity.this, "Error launching activity. Please try again.", Toast.LENGTH_SHORT).show();
             }
         });
 
