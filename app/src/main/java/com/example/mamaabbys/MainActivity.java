@@ -31,9 +31,11 @@ import android.app.PendingIntent;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.os.Build;
+import androidx.activity.OnBackPressedCallback;
 
 import java.io.File;
 import java.util.List;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
@@ -44,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private DashboardPagerAdapter pagerAdapter;
     private FloatingActionButton fab;
     private MaterialButton deleteAllButton;
+    private MaterialButton cancelButton;
     private MyDataBaseHelper dbHelper;
     private ImageButton notificationButton;
     private TextView notificationBadge;
@@ -275,11 +278,12 @@ public class MainActivity extends AppCompatActivity {
             tabLayout = findViewById(R.id.tabLayout);
             fab = findViewById(R.id.quickActionsBar);
             deleteAllButton = findViewById(R.id.deleteAllButton);
+            cancelButton = findViewById(R.id.cancelButton);
 
             if (notificationButton == null || notificationBadge == null || 
                 settingsButton == null || viewPager == null || 
                 tabLayout == null || fab == null || deleteAllButton == null ||
-                welcomeText == null) {
+                welcomeText == null || cancelButton == null) {
                 throw new RuntimeException("Failed to initialize views");
             }
 
@@ -338,7 +342,123 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        deleteAllButton.setOnClickListener(v -> showDeleteConfirmationDialog());
+        deleteAllButton.setOnClickListener(v -> {
+            InventoryFragment fragment = (InventoryFragment) getSupportFragmentManager()
+                .findFragmentByTag("f" + viewPager.getCurrentItem());
+            if (fragment != null) {
+                InventoryAdapter adapter = fragment.getAdapter();
+                if (adapter != null) {
+                    if (adapter.isSelectionMode()) {
+                        // If in selection mode, show delete confirmation for selected items
+                        Set<String> selectedItems = adapter.getSelectedItems();
+                        if (!selectedItems.isEmpty()) {
+                            showDeleteSelectedItemsDialog(selectedItems);
+                        } else {
+                            Toast.makeText(this, "Please select items to delete", Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        // Enter selection mode
+                        adapter.setSelectionMode(true);
+                        deleteAllButton.setText("Delete Selected");
+                        cancelButton.setVisibility(View.VISIBLE);
+                    }
+                }
+            }
+        });
+
+        cancelButton.setOnClickListener(v -> {
+            InventoryFragment fragment = (InventoryFragment) getSupportFragmentManager()
+                .findFragmentByTag("f" + viewPager.getCurrentItem());
+            if (fragment != null) {
+                InventoryAdapter adapter = fragment.getAdapter();
+                if (adapter != null && adapter.isSelectionMode()) {
+                    // Exit selection mode
+                    adapter.setSelectionMode(false);
+                    deleteAllButton.setText("Select");
+                    cancelButton.setVisibility(View.GONE);
+                }
+            }
+        });
+
+        // Add back button press handler for selection mode
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                InventoryFragment fragment = (InventoryFragment) getSupportFragmentManager()
+                    .findFragmentByTag("f" + viewPager.getCurrentItem());
+                if (fragment != null) {
+                    InventoryAdapter adapter = fragment.getAdapter();
+                    if (adapter != null && adapter.isSelectionMode()) {
+                        // Exit selection mode
+                        adapter.setSelectionMode(false);
+                        deleteAllButton.setText("Select");
+                        cancelButton.setVisibility(View.GONE);
+                    } else {
+                        // Let the system handle the back press
+                        setEnabled(false);
+                        getOnBackPressedDispatcher().onBackPressed();
+                    }
+                }
+            }
+        });
+    }
+
+    private void showDeleteSelectedItemsDialog(Set<String> selectedItems) {
+        if (selectedItems == null || selectedItems.isEmpty()) {
+            Toast.makeText(this, "Please select items to delete", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+            .setTitle("Delete Selected Items")
+            .setMessage("Are you sure you want to delete the selected items? This action cannot be undone.")
+            .setPositiveButton("Delete", (dialog, which) -> {
+                try {
+                    // Delete items from database
+                    dbHelper.deleteSelectedInventoryItems(selectedItems);
+                    
+                    // Refresh the inventory list
+                    refreshInventoryFragment();
+                    
+                    // Exit selection mode
+                    InventoryFragment fragment = (InventoryFragment) getSupportFragmentManager()
+                        .findFragmentByTag("f" + viewPager.getCurrentItem());
+                    if (fragment != null) {
+                        InventoryAdapter adapter = fragment.getAdapter();
+                        if (adapter != null) {
+                            adapter.setSelectionMode(false);
+                            deleteAllButton.setText("Select");
+                            cancelButton.setVisibility(View.GONE);
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error deleting selected items: " + e.getMessage(), e);
+                    String errorMessage = e.getMessage();
+                    if (errorMessage != null && errorMessage.contains("Failed to delete items:")) {
+                        errorMessage = errorMessage.substring(errorMessage.indexOf(":") + 1).trim();
+                    }
+                    Toast.makeText(this, "Error deleting items: " + errorMessage, Toast.LENGTH_LONG).show();
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void updateUIForPosition(int position) {
+        if (position == 0) {
+            fab.show();
+            deleteAllButton.setVisibility(View.VISIBLE);
+            deleteAllButton.setText("Select");
+            cancelButton.setVisibility(View.GONE);
+        } else if (position == 2) { // Delivery tab
+            fab.hide();
+            deleteAllButton.setVisibility(View.GONE);
+            cancelButton.setVisibility(View.GONE);
+        } else {
+            fab.hide();
+            deleteAllButton.setVisibility(View.GONE);
+            cancelButton.setVisibility(View.GONE);
+        }
     }
 
     private void setupPageChangeListener() {
@@ -348,37 +468,6 @@ public class MainActivity extends AppCompatActivity {
                 updateUIForPosition(position);
             }
         });
-    }
-
-    private void updateUIForPosition(int position) {
-        if (position == 0) {
-            fab.show();
-            deleteAllButton.setVisibility(View.VISIBLE);
-        } else if (position == 2) { // Delivery tab
-            fab.hide();
-            deleteAllButton.setVisibility(View.GONE);
-        } else {
-            fab.hide();
-            deleteAllButton.setVisibility(View.GONE);
-        }
-    }
-
-    private void showDeleteConfirmationDialog() {
-        new AlertDialog.Builder(this)
-            .setTitle("Delete All Items")
-            .setMessage("Are you sure you want to delete all inventory items? This action cannot be undone.")
-            .setPositiveButton("Delete", (dialog, which) -> {
-                try {
-                    dbHelper.deleteAllInventory();
-                    refreshInventoryFragment();
-                    Toast.makeText(this, "All items deleted successfully", Toast.LENGTH_SHORT).show();
-                } catch (Exception e) {
-                    Log.e(TAG, "Error deleting inventory: " + e.getMessage());
-                    Toast.makeText(this, "Error deleting items: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
     }
 
     private void refreshInventoryFragment() {

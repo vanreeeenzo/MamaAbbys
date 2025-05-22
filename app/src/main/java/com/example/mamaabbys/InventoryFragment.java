@@ -313,4 +313,8 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
             .setNegativeButton("Cancel", null)
             .show();
     }
+
+    public InventoryAdapter getAdapter() {
+        return adapter;
+    }
 } 

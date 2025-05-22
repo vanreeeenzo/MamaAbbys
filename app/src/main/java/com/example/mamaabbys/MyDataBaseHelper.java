@@ -11,6 +11,7 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -164,7 +165,8 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 TABLE_DELIVERY,
                 TABLE_DELETED_NOTIFICATIONS,
                 TABLE_READ_NOTIFICATIONS,
-                TABLE_PRODUCT_PRICES
+                TABLE_PRODUCT_PRICES,
+                TABLE_SALES
             };
 
             db.beginTransaction();
@@ -228,6 +230,9 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 break;
             case TABLE_PRODUCT_PRICES:
                 createProductPricesTable(db);
+                break;
+            case TABLE_SALES:
+                createSalesTable(db);
                 break;
             default:
                 throw new RuntimeException("Unknown table: " + tableName);
@@ -383,6 +388,18 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         Log.d(TAG, "Product prices table created");
     }
 
+    private void createSalesTable(SQLiteDatabase db) {
+        String query = "CREATE TABLE IF NOT EXISTS " + TABLE_SALES + " (" +
+                COLUMN_SALE_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_PRODUCT_ID + " TEXT NOT NULL, " +
+                COLUMN_QUANTITY + " INTEGER NOT NULL, " +
+                COLUMN_TOTAL_AMOUNT + " REAL NOT NULL, " +
+                COLUMN_SALE_DATE + " TEXT NOT NULL, " +
+                "FOREIGN KEY(" + COLUMN_PRODUCT_ID + ") REFERENCES " + TABLE_INVENTORY + "(" + COLUMN_ID + "));";
+        db.execSQL(query);
+        Log.d(TAG, "Sales table created");
+    }
+
     @Override
     public void onCreate(SQLiteDatabase db) {
         try {
@@ -397,6 +414,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             createDeletedNotificationsTable(db);
             createReadNotificationsTable(db);
             createProductPricesTable(db);
+            createSalesTable(db);
             
             // Insert initial data
             insertInitialPrices(db);
@@ -465,6 +483,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELETED_NOTIFICATIONS);
             db.execSQL("DROP TABLE IF EXISTS " + TABLE_READ_NOTIFICATIONS);
             db.execSQL("DROP TABLE IF EXISTS " + TABLE_PRODUCT_PRICES);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_SALES);
             onCreate(db);
             Log.d(TAG, "Database downgrade completed successfully");
         } catch (Exception e) {
@@ -1690,9 +1709,6 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             if (cursor != null && !cursor.isClosed()) {
                 cursor.close();
             }
-            if (db != null && db.isOpen()) {
-                db.close();
-            }
         }
         
         return orders;
@@ -1816,6 +1832,88 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 } catch (Exception e) {
                     Log.e("MyDataBaseHelper", "Error ending transaction: " + e.getMessage());
                 }
+            }
+        }
+    }
+
+    public void deleteSelectedInventoryItems(Set<String> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            Log.e(TAG, "No items selected for deletion");
+            return;
+        }
+
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            if (db == null) {
+                throw new RuntimeException("Failed to get writable database");
+            }
+
+            // Verify tables exist before proceeding
+            verifyTablesExist(db);
+
+            db.beginTransaction();
+            
+            try {
+                // First, get the list of items to be deleted for logging
+                List<String> itemNames = new ArrayList<>();
+                String selectQuery = "SELECT " + COLUMN_NAME + " FROM " + TABLE_INVENTORY + 
+                    " WHERE " + COLUMN_ID + " IN (" + String.join(",", Collections.nCopies(itemIds.size(), "?")) + ")";
+                
+                Cursor cursor = db.rawQuery(selectQuery, itemIds.toArray(new String[0]));
+                if (cursor != null) {
+                    while (cursor.moveToNext()) {
+                        itemNames.add(cursor.getString(0));
+                    }
+                    cursor.close();
+                }
+
+                if (itemNames.isEmpty()) {
+                    throw new RuntimeException("No items found to delete");
+                }
+
+                // Delete from inventory table
+                String placeholders = String.join(",", Collections.nCopies(itemIds.size(), "?"));
+                String query = "DELETE FROM " + TABLE_INVENTORY + " WHERE " + COLUMN_ID + " IN (" + placeholders + ")";
+                db.execSQL(query, itemIds.toArray(new String[0]));
+                
+                // Delete related order items
+                String orderItemsQuery = "DELETE FROM " + TABLE_ORDER_ITEMS + 
+                    " WHERE " + COLUMN_ORDER_PRODUCT_ID + " IN (" + placeholders + ")";
+                db.execSQL(orderItemsQuery, itemIds.toArray(new String[0]));
+                
+                // Delete related sales records
+                String salesQuery = "DELETE FROM " + TABLE_SALES + 
+                    " WHERE " + COLUMN_PRODUCT_ID + " IN (" + placeholders + ")";
+                db.execSQL(salesQuery, itemIds.toArray(new String[0]));
+                
+                db.setTransactionSuccessful();
+                
+                // Log successful deletion
+                Log.d(TAG, "Successfully deleted " + itemIds.size() + " inventory items: " + String.join(", ", itemNames));
+                
+                // Show toast message with deleted items
+                if (context != null) {
+                    String message = "Successfully deleted: " + String.join(", ", itemNames);
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error during deletion transaction: " + e.getMessage(), e);
+                throw new RuntimeException("Failed to delete items: " + e.getMessage());
+            } finally {
+                if (db.inTransaction()) {
+                    db.endTransaction();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting selected inventory items: " + e.getMessage(), e);
+            if (context != null) {
+                Toast.makeText(context, "Error deleting items: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+            throw new RuntimeException("Failed to delete items: " + e.getMessage());
+        } finally {
+            if (db != null && db.isOpen()) {
+                db.close();
             }
         }
     }

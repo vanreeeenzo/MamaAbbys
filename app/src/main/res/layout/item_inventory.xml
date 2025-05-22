@@ -13,13 +13,22 @@
         android:layout_height="wrap_content"
         android:padding="16dp">
 
+        <CheckBox
+            android:id="@+id/itemCheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
         <ImageView
             android:id="@+id/itemIcon"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_package"
             android:tint="?attr/colorPrimary"
-            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintStart_toEndOf="@id/itemCheckBox"
             app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
