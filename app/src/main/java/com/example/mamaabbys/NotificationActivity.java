@@ -1,8 +1,11 @@
 package com.example.mamaabbys;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+
+import androidx.annotation.RequiresPermission;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -15,9 +18,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class NotificationActivity extends AppCompatActivity implements 
-    NotificationAdapter.OnNotificationDeleteListener,
-    NotificationAdapter.OnNotificationReadListener {
+public class NotificationActivity extends AppCompatActivity implements
+        NotificationAdapter.OnNotificationDeleteListener,
+        NotificationAdapter.OnNotificationReadListener {
 
     private MyDataBaseHelper myDB;
     private RecyclerView recyclerView;
@@ -44,20 +47,40 @@ public class NotificationActivity extends AppCompatActivity implements
         adapter = new NotificationAdapter(notificationItems, this, this);
         recyclerView.setAdapter(adapter);
 
-        // Load and check deliveries and stock
-        loadNotifications();
-        checkStockStatus();
+        // Load notifications including both delivery and stock notifications
+        loadAllNotifications();
     }
 
-    private void loadNotifications() {
+    private void loadAllNotifications() {
         int userId = sessionManager.getUserId();
         if (userId == -1) {
             Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        List<Delivery> deliveries = myDB.getAllDeliveries(userId);
         notificationItems.clear();
+
+        // Load delivery notifications
+        loadDeliveryNotifications(userId);
+
+        // Load stock notifications
+        loadStockNotifications(userId);
+
+        // Sort notifications: unread first, then read
+        notificationItems.sort((a, b) -> {
+            if (a.isRead() == b.isRead()) {
+                // If both are read or both are unread, sort by timestamp (newest first)
+                return Long.compare(b.getTimestamp(), a.getTimestamp());
+            }
+            // Unread notifications come first
+            return Boolean.compare(a.isRead(), b.isRead());
+        });
+
+        adapter.updateNotifications(notificationItems);
+    }
+
+    private void loadDeliveryNotifications(int userId) {
+        List<Delivery> deliveries = myDB.getAllDeliveries(userId);
 
         for (Delivery delivery : deliveries) {
             // Skip if notification was previously deleted
@@ -84,40 +107,84 @@ public class NotificationActivity extends AppCompatActivity implements
             if (!notificationTitle.isEmpty() && !notificationMessage.isEmpty()) {
                 boolean isRead = myDB.isNotificationRead(delivery.getId(), userId);
                 NotificationItem notificationItem = new NotificationItem(
-                    delivery.getId(),
-                    notificationTitle,
-                    notificationMessage,
-                    delivery.getDeliveryDate(),
-                    delivery.getDeliveryTime(),
-                    orderDetails,
-                    true // This is a delivery notification
+                        delivery.getId(),
+                        notificationTitle,
+                        notificationMessage,
+                        delivery.getDeliveryDate(),
+                        delivery.getDeliveryTime(),
+                        orderDetails,
+                        true // This is a delivery notification
                 );
                 notificationItem.setRead(isRead);
                 notificationItems.add(notificationItem);
-                
-                // Show system notification
-                NotificationHelper.showNotification(this, notificationTitle, notificationMessage);
+
+                // Show system notification only if not read and not deleted
+                if (!isRead) {
+                    NotificationHelper.showNotification(this, notificationTitle, notificationMessage);
+                }
             }
         }
+    }
 
-        // Sort notifications: unread first, then read
-        notificationItems.sort((a, b) -> {
-            if (a.isRead() == b.isRead()) {
-                // If both are read or both are unread, sort by timestamp (newest first)
-                return Long.compare(b.getTimestamp(), a.getTimestamp());
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    private void loadStockNotifications(int userId) {
+        List<InventoryItem> inventoryItems = myDB.getAllInventoryItems(userId);
+
+        for (InventoryItem item : inventoryItems) {
+            String stockInfo = item.getStockInfo();
+
+            if (stockInfo.contains("Out of Stock!")) {
+                createStockNotificationIfNeeded(item, "out", userId);
+            } else if (stockInfo.contains("Low Stock!")) {
+                createStockNotificationIfNeeded(item, "low", userId);
             }
-            // Unread notifications come first
-            return Boolean.compare(a.isRead(), b.isRead());
-        });
+        }
+    }
 
-        adapter.updateNotifications(notificationItems);
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    private void createStockNotificationIfNeeded(InventoryItem item, String type, int userId) {
+        String notificationId = "stock_" + type + "_" + item.getId();
+
+        // Skip if notification was previously deleted
+        if (myDB.isNotificationDeleted(notificationId, userId)) {
+            return;
+        }
+
+        String title = type.equals("out") ? "Out of Stock Alert" : "Low Stock Alert";
+        String message;
+
+        if (type.equals("out")) {
+            message = item.getName() + " is out of stock! Please restock soon.";
+        } else {
+            message = item.getName() + " is running low on stock! Current stock: ";
+        }
+
+        NotificationItem notificationItem = new NotificationItem(
+                notificationId,
+                title,
+                message,
+                item.getName(),
+                item.getQuantity(),
+                item.getMinThreshold()
+        );
+
+        // Check if this notification was already read
+        boolean isRead = myDB.isNotificationRead(notificationId, userId);
+        notificationItem.setRead(isRead);
+
+        notificationItems.add(notificationItem);
+
+        // Show system notification only if not read
+        if (!isRead) {
+            NotificationHelper.showStockNotification(this, title, message);
+        }
     }
 
     private long calculateDaysLeft(Delivery delivery) {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
             Date deliveryDate = sdf.parse(delivery.getDeliveryDate());
-            
+
             // Get today's date at midnight
             Calendar today = Calendar.getInstance();
             today.set(Calendar.HOUR_OF_DAY, 0);
@@ -145,69 +212,6 @@ public class NotificationActivity extends AppCompatActivity implements
         return Long.MAX_VALUE;
     }
 
-    private void checkStockStatus() {
-        int userId = sessionManager.getUserId();
-        if (userId == -1) {
-            Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        List<InventoryItem> inventoryItems = myDB.getAllInventoryItems(userId);
-        for (InventoryItem item : inventoryItems) {
-            String stockInfo = item.getStockInfo();
-            if (stockInfo.contains("Out of Stock!")) {
-                createOutOfStockNotification(item);
-            } else if (stockInfo.contains("Low Stock!")) {
-                createLowStockNotification(item);
-            }
-        }
-    }
-
-    private void createOutOfStockNotification(InventoryItem item) {
-        String notificationId = "stock_" + item.getId();
-        if (myDB.isNotificationDeleted(notificationId, sessionManager.getUserId())) {
-            return;
-        }
-
-        String title = "Out of Stock Alert";
-        String message = item.getName() + " is out of stock! Please restock soon.";
-        
-        NotificationItem notificationItem = new NotificationItem(
-            notificationId,
-            title,
-            message,
-            item.getName(),
-            item.getQuantity(),
-            item.getMinThreshold()
-        );
-        
-        notificationItems.add(notificationItem);
-        NotificationHelper.showStockNotification(this, title, message);
-    }
-
-    private void createLowStockNotification(InventoryItem item) {
-        String notificationId = "stock_" + item.getId();
-        if (myDB.isNotificationDeleted(notificationId, sessionManager.getUserId())) {
-            return;
-        }
-
-        String title = "Low Stock Alert";
-        String message = item.getName() + " is running low on stock! Current stock: " + 
-                        item.getQuantity() + " (Minimum threshold: " + item.getMinThreshold() + ")";
-        
-        NotificationItem notificationItem = new NotificationItem(
-            notificationId,
-            title,
-            message,
-            item.getName(),
-            item.getQuantity(),
-            item.getMinThreshold()
-        );
-        
-        notificationItems.add(notificationItem);
-        NotificationHelper.showStockNotification(this, title, message);
-    }
-
     @Override
     public void onDeleteNotification(NotificationItem notification) {
         deleteNotification(notification);
@@ -229,6 +233,10 @@ public class NotificationActivity extends AppCompatActivity implements
             notificationItems.remove(notification);
             adapter.updateNotifications(notificationItems);
             Toast.makeText(this, "Notification deleted", Toast.LENGTH_SHORT).show();
+
+            // Broadcast that a notification was deleted
+            Intent intent = new Intent("com.example.mamaabbys.NOTIFICATION_DELETED");
+            sendBroadcast(intent);
         } else {
             Toast.makeText(this, "Failed to delete notification", Toast.LENGTH_SHORT).show();
         }
@@ -243,14 +251,75 @@ public class NotificationActivity extends AppCompatActivity implements
 
         if (myDB.markNotificationAsRead(notification.getId(), userId)) {
             notification.setRead(true);
+
+            // Re-sort the list to move read notification to the bottom
+            notificationItems.sort((a, b) -> {
+                if (a.isRead() == b.isRead()) {
+                    return Long.compare(b.getTimestamp(), a.getTimestamp());
+                }
+                return Boolean.compare(a.isRead(), b.isRead());
+            });
+
             adapter.updateNotifications(notificationItems);
             Toast.makeText(this, "Marked as read", Toast.LENGTH_SHORT).show();
-            
+
             // Broadcast that a notification was marked as read
             Intent intent = new Intent("com.example.mamaabbys.NOTIFICATION_READ");
             sendBroadcast(intent);
         } else {
             Toast.makeText(this, "Failed to mark as read", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Refresh notifications when returning to this activity
+        loadAllNotifications();
+    }
+
+    // Method to get unread notification count for badge
+    public int getUnreadNotificationCount() {
+        int userId = sessionManager.getUserId();
+        if (userId == -1) {
+            return 0;
+        }
+
+        int unreadCount = 0;
+
+        // Count unread delivery notifications
+        List<Delivery> deliveries = myDB.getAllDeliveries(userId);
+        for (Delivery delivery : deliveries) {
+            if (!myDB.isNotificationDeleted(delivery.getId(), userId)) {
+                long daysLeft = calculateDaysLeft(delivery);
+                if (daysLeft == 7 || daysLeft == 3 || daysLeft == 0) {
+                    if (!myDB.isNotificationRead(delivery.getId(), userId)) {
+                        unreadCount++;
+                    }
+                }
+            }
+        }
+
+        // Count unread stock notifications
+        List<InventoryItem> inventoryItems = myDB.getAllInventoryItems(userId);
+        for (InventoryItem item : inventoryItems) {
+            String stockInfo = item.getStockInfo();
+
+            if (stockInfo.contains("Out of Stock!")) {
+                String notificationId = "stock_out_" + item.getId();
+                if (!myDB.isNotificationDeleted(notificationId, userId) &&
+                        !myDB.isNotificationRead(notificationId, userId)) {
+                    unreadCount++;
+                }
+            } else if (stockInfo.contains("Low Stock!")) {
+                String notificationId = "stock_low_" + item.getId();
+                if (!myDB.isNotificationDeleted(notificationId, userId) &&
+                        !myDB.isNotificationRead(notificationId, userId)) {
+                    unreadCount++;
+                }
+            }
+        }
+
+        return unreadCount;
     }
 }
