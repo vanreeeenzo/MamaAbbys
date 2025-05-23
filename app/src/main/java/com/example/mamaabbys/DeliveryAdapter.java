@@ -55,6 +55,7 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
     public void onBindViewHolder(@NonNull DeliveryViewHolder holder, int position) {
         DeliveryItem item = items.get(position);
         holder.orderNumber.setText(item.getOrderNumber());
+        holder.name.setText(item.getName());
         holder.schedule.setText(item.getSchedule());
         holder.location.setText("Location: " + item.getLocation());
         holder.deliveryIcon.setImageResource(item.getIconResId());
@@ -105,13 +106,14 @@ public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.Delive
     }
 
     static class DeliveryViewHolder extends RecyclerView.ViewHolder {
-        TextView orderNumber, schedule, location, overdueBadge;
+        TextView orderNumber, name, schedule, location, overdueBadge;
         ImageView deliveryIcon;
         Button btnMarkAsDone, btnCancelDelivery;
 
         DeliveryViewHolder(@NonNull View itemView) {
             super(itemView);
             orderNumber = itemView.findViewById(R.id.orderNumber);
+            name = itemView.findViewById(R.id.name);
             schedule = itemView.findViewById(R.id.schedule);
             location = itemView.findViewById(R.id.location);
             deliveryIcon = itemView.findViewById(R.id.deliveryIcon);

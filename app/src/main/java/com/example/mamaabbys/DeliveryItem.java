@@ -7,14 +7,16 @@ import java.util.Locale;
 
 public class DeliveryItem {
     private String id;
+    private String name;
     private String orderNumber;
     private String schedule;
     private String location;
     private int iconResId;
     private boolean isDone;
 
-    public DeliveryItem(String id, String orderNumber, String schedule, String location, int iconResId) {
+    public DeliveryItem(String id, String name, String orderNumber, String schedule, String location, int iconResId) {
         this.id = id;
+        this.name = name;
         this.orderNumber = orderNumber;
         this.schedule = schedule;
         this.location = location;
@@ -24,6 +26,14 @@ public class DeliveryItem {
 
     public String getId() {
         return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getOrderNumber() {

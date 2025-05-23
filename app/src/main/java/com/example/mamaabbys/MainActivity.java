@@ -32,6 +32,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.os.Build;
 import androidx.activity.OnBackPressedCallback;
+import android.app.NotificationManager;
 
 import java.io.File;
 import java.util.List;
@@ -633,32 +634,40 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showDeliveryNotification(Delivery delivery) {
-        int userId = sessionManager.getUserId();
-        if (userId == -1) {
-            Toast.makeText(this, "User session expired. Please login again.", Toast.LENGTH_SHORT).show();
-            return;
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager == null) return;
+
+        // Create notification channel for Android O and above
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID,
+                "Delivery Notifications",
+                NotificationManager.IMPORTANCE_HIGH
+            );
+            channel.setDescription("Notifications for delivery updates");
+            notificationManager.createNotificationChannel(channel);
         }
 
+        // Create notification
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_bell)
-                .setContentTitle("New Delivery")
-                .setContentText(delivery.getOrderDescription())
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setAutoCancel(true);
+            .setSmallIcon(R.drawable.ic_truck)
+            .setContentTitle("New Delivery for " + delivery.getDeliveryName())
+            .setContentText("Order: " + delivery.getOrderDescription() + 
+                          "\nDate: " + delivery.getDeliveryDate() + 
+                          "\nTime: " + delivery.getDeliveryTime() + 
+                          "\nLocation: " + delivery.getLocation())
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true);
 
-        Intent intent = new Intent(this, DeliveryDetailsActivity.class);
-        intent.putExtra("delivery_id", delivery.getId());
+        // Create intent for notification click
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra("deliveryId", delivery.getId());
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
         builder.setContentIntent(pendingIntent);
 
-        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        notificationManager.notify(delivery.getId().hashCode(), builder.build());
-        
-        // Mark notification as read
-        dbHelper.markNotificationAsRead(delivery.getId(), userId);
+        // Show notification
+        notificationManager.notify((int) System.currentTimeMillis(), builder.build());
     }
 }
 

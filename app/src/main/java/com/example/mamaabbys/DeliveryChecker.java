@@ -25,6 +25,7 @@ public class DeliveryChecker {
                     long daysLeft = diffInMillis / (1000 * 60 * 60 * 24);
 
                     String message = null;
+                    String title = "Delivery To: " + delivery.getDeliveryName();
 
                     if (daysLeft == 7) {
                         message = "Your delivery is scheduled for " + delivery.getDeliveryDate() +
@@ -37,7 +38,7 @@ public class DeliveryChecker {
                     }
 
                     if (message != null) {
-                        NotificationHelper.showNotification(context, delivery.getOrderDescription(), message);
+                        NotificationHelper.showNotification(context, title, message);
                     }
                 }
             } catch (Exception e) {

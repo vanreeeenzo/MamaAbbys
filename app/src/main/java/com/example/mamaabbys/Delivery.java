@@ -2,14 +2,16 @@ package com.example.mamaabbys;
 
 public class Delivery {
     private String id;
+    private String deliveryName;
     private String orderDescription;
     private String deliveryDate;
     private String deliveryTime;
+    private String location;
     private String status;
     private boolean isDone;
-    private String location;
 
-    public Delivery(String orderDescription, String deliveryDate, String deliveryTime, String location) {
+    public Delivery(String deliveryName, String orderDescription, String deliveryDate, String deliveryTime, String location) {
+        this.deliveryName = deliveryName;
         this.orderDescription = orderDescription;
         this.deliveryDate = deliveryDate;
         this.deliveryTime = deliveryTime;
@@ -23,6 +25,14 @@ public class Delivery {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getDeliveryName() {
+        return deliveryName;
+    }
+
+    public void setDeliveryName(String deliveryName) {
+        this.deliveryName = deliveryName;
     }
 
     public String getOrderDescription() {
@@ -49,6 +59,14 @@ public class Delivery {
         this.deliveryTime = deliveryTime;
     }
 
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
     public String getStatus() {
         return status;
     }
@@ -63,13 +81,5 @@ public class Delivery {
 
     public void setDone(boolean done) {
         isDone = done;
-    }
-
-    public String getLocation() {
-        return location;
-    }
-
-    public void setLocation(String location) {
-        this.location = location;
     }
 }

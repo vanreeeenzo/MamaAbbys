@@ -73,8 +73,10 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
         
         for (Delivery delivery : deliveries) {
             String schedule = "Scheduled for " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime();
+            // Create DeliveryItem with all required parameters including name
             DeliveryItem item = new DeliveryItem(
                 delivery.getId(),
+                delivery.getDeliveryName(),
                 delivery.getOrderDescription(),
                 schedule,
                 delivery.getLocation(),
@@ -134,7 +136,7 @@ public class DeliveryFragment extends Fragment implements DeliveryAdapter.OnItem
             NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), "your_channel_id")
                     .setSmallIcon(R.drawable.ic_truck)
                     .setContentTitle("Upcoming Delivery")
-                    .setContentText("Your order " + delivery.getOrderDescription() + " is coming soon!")
+                    .setContentText("Delivery To: " + delivery.getDeliveryName() + "\nOrder: " + delivery.getOrderDescription() + " is coming soon!")
                     .setPriority(NotificationCompat.PRIORITY_HIGH);
 
             NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getContext());

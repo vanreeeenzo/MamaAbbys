@@ -71,13 +71,13 @@ public class NotificationActivity extends AppCompatActivity implements
             String orderDetails = "Order: " + delivery.getOrderDescription() + "\nLocation: " + delivery.getLocation();
 
             if (daysLeft == 7) {
-                notificationTitle = "Delivery in 7 days";
+                notificationTitle = "Delivery To: " + delivery.getDeliveryName() + " (7 days)";
                 notificationMessage = "Your order is scheduled for delivery in 7 days on " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
             } else if (daysLeft == 3) {
-                notificationTitle = "Delivery in 3 days";
+                notificationTitle = "Delivery To: " + delivery.getDeliveryName() + " (3 days)";
                 notificationMessage = "Your order is scheduled for delivery in 3 days on " + delivery.getDeliveryDate() + " at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
             } else if (daysLeft == 0) {
-                notificationTitle = "Delivery today!";
+                notificationTitle = "Delivery To: " + delivery.getDeliveryName() + " (Today)";
                 notificationMessage = "Your order is scheduled for delivery today at " + delivery.getDeliveryTime() + "\nLocation: " + delivery.getLocation();
             }
 

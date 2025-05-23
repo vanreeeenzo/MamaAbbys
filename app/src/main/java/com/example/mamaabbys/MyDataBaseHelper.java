@@ -27,7 +27,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "MyDataBaseHelper";
     private Context context;
     public static final String DATABASE_NAME = "MamaAbbys.db";
-    private static final int DATABASE_VERSION = 10;
+    private static final int DATABASE_VERSION = 11;
 
     private static final String TABLE_INVENTORY = "Inventory";
     private static final String COLUMN_ID = "_id";
@@ -45,6 +45,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
 
     private static final String TABLE_DELIVERY = "delivery";
     private static final String COLUMN_DELIVERY_ID = "id";
+    private static final String COLUMN_DELIVERY_NAME = "delivery_name";
     private static final String COLUMN_ORDER = "order_description";
     private static final String COLUMN_DATE = "delivery_date";
     private static final String COLUMN_TIME = "delivery_time";
@@ -348,6 +349,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
         String query = "CREATE TABLE " + TABLE_DELIVERY + " (" +
                 COLUMN_DELIVERY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 COLUMN_USER_ID + " INTEGER NOT NULL, " +
+                COLUMN_DELIVERY_NAME + " TEXT NOT NULL, " +
                 COLUMN_ORDER + " TEXT, " +
                 COLUMN_DATE + " TEXT, " +
                 COLUMN_TIME + " TEXT, " +
@@ -456,6 +458,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
                 db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELETED_NOTIFICATIONS);
                 createDeletedNotificationsTable(db);
                 Log.d(TAG, "Upgraded deleted_notifications table");
+            }
+
+            if (oldVersion < 11) {
+                // Drop and recreate delivery table with correct foreign key
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_DELIVERY);
+                createDeliveryTable(db);
+                Log.d(TAG, "Upgraded delivery table");
             }
             
             db.setTransactionSuccessful();
@@ -909,14 +918,31 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
     public boolean addDelivery(Delivery delivery, int userId) {
         SQLiteDatabase db = null;
         try {
+            // First verify that the user exists
+            db = this.getReadableDatabase();
+            Cursor cursor = db.query(TABLE_USERS, new String[]{COLUMN_USER_ID}, 
+                COLUMN_USER_ID + " = ?", new String[]{String.valueOf(userId)}, 
+                null, null, null);
+            
+            if (cursor == null || !cursor.moveToFirst()) {
+                Log.e(TAG, "User with ID " + userId + " does not exist");
+                return false;
+            }
+            cursor.close();
+
+            // Now proceed with adding the delivery
             db = this.getWritableDatabase();
             ContentValues values = new ContentValues();
+            values.put(COLUMN_DELIVERY_NAME, delivery.getDeliveryName());
             values.put(COLUMN_ORDER, delivery.getOrderDescription());
             values.put(COLUMN_DATE, delivery.getDeliveryDate());
             values.put(COLUMN_TIME, delivery.getDeliveryTime());
             values.put(COLUMN_STATUS, "Pending");
             values.put(COLUMN_LOCATION, delivery.getLocation());
             values.put(COLUMN_USER_ID, userId);
+
+            // Log the values being inserted
+            Log.d(TAG, "Attempting to insert delivery with values: " + values.toString());
 
             long result = db.insert(TABLE_DELIVERY, null, values);
             if (result == -1) {
@@ -926,8 +952,7 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             Log.d(TAG, "Successfully added delivery with ID: " + result);
             return true;
         } catch (Exception e) {
-            Log.e(TAG, "Error adding delivery: " + e.getMessage());
-            e.printStackTrace();
+            Log.e(TAG, "Error adding delivery: " + e.getMessage(), e);
             return false;
         } finally {
             if (db != null && db.isOpen()) {
@@ -951,13 +976,14 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     String id = cursor.getString(cursor.getColumnIndex(COLUMN_DELIVERY_ID));
+                    String name = cursor.getString(cursor.getColumnIndex(COLUMN_DELIVERY_NAME));
                     String order = cursor.getString(cursor.getColumnIndex(COLUMN_ORDER));
                     String date = cursor.getString(cursor.getColumnIndex(COLUMN_DATE));
                     String time = cursor.getString(cursor.getColumnIndex(COLUMN_TIME));
                     String status = cursor.getString(cursor.getColumnIndex(COLUMN_STATUS));
                     String location = cursor.getString(cursor.getColumnIndex(COLUMN_LOCATION));
 
-                    Delivery delivery = new Delivery(order, date, time, location);
+                    Delivery delivery = new Delivery(name, order, date, time, location);
                     delivery.setId(id);
                     delivery.setStatus(status);
                     deliveries.add(delivery);
@@ -1055,12 +1081,13 @@ public class MyDataBaseHelper extends SQLiteOpenHelper {
             
             if (cursor != null && cursor.moveToFirst()) {
                 String id = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DELIVERY_ID));
+                String name = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DELIVERY_NAME));
                 String orderDescription = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ORDER));
                 String deliveryDate = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DATE));
                 String deliveryTime = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TIME));
                 String location = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_LOCATION));
                 
-                Delivery delivery = new Delivery(orderDescription, deliveryDate, deliveryTime, location);
+                Delivery delivery = new Delivery(name, orderDescription, deliveryDate, deliveryTime, location);
                 delivery.setId(id);
                 return delivery;
             }
