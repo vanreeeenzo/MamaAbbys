@@ -244,7 +244,7 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
                 );
                 productsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 productsSpinner.setAdapter(productsAdapter);
-                loadInventoryData(); // Reload data when category changes
+                filterInventoryItems(""); // Filter with current search query
             }
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
@@ -256,7 +256,7 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
         productsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                loadInventoryData(); // Reload data when product changes
+                filterInventoryItems(""); // Filter with current search query
             }
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
@@ -275,7 +275,24 @@ public class InventoryFragment extends Fragment implements InventoryAdapter.OnIt
                     Toast.makeText(requireContext(), "User session expired. Please login again.", Toast.LENGTH_SHORT).show());
                 return;
             }
-            List<InventoryItem> filteredList = dbHelper.searchInventoryItems(searchQuery, userId);
+
+            String selectedCategory = categoriesSpinner.getSelectedItem().toString();
+            String selectedProduct = productsSpinner.getSelectedItem().toString();
+
+            List<InventoryItem> filteredList = new ArrayList<>();
+            List<InventoryItem> searchResults = dbHelper.searchInventoryItems(searchQuery, userId);
+
+            for (InventoryItem item : searchResults) {
+                boolean matchesCategory = selectedCategory.equals("All Categories") || 
+                                       item.getCategory().equals(selectedCategory);
+                boolean matchesProduct = selectedProduct.equals("All Products") || 
+                                       item.getName().equals(selectedProduct);
+
+                if (matchesCategory && matchesProduct) {
+                    filteredList.add(item);
+                }
+            }
+
             requireActivity().runOnUiThread(() -> updateAdapter(filteredList));
         }).start();
     }
